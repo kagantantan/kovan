@@ -1,0 +1,44 @@
+# Kovan ayarları
+
+port: 8765
+
+# Yeni fikirde varsayılan mod:
+#   hibrit  -> her ajan kartındaki motoru kullanır (kod: yerel Qwen, analiz ve onay: Claude)
+#   claude  -> hepsi Claude (yerel motor hazır değilse ya da kıyas için)
+#   deneme  -> token harcamaz, akışı gösterir
+motor: hibrit
+
+# claude komutu PATH'te değilse tam yolunu yaz. Terminal'de `which claude` sana yolu söyler.
+claude_yolu: claude
+
+# Ortamda ANTHROPIC_API_KEY ya da ANTHROPIC_BASE_URL gibi değişkenler varsa claude onları kullanıp
+# API'den ücretlendirebilir ya da başka bir sunucuya (ör. Ollama) gidebilir.
+# true: Claude ajanları için bunlar yok sayılır, Claude aboneliğinle giriş yaptığın hesap kullanılır.
+# (Yerel motor kendi değişkenlerini yalnızca kendi ajanları için ayarlar.)
+api_anahtarini_yoksay: true
+
+# Yerel motorlar. Ajan kartında `motor: qwen-yerel` diyen ajanlar bunu kullanır.
+# Kurulum: Ollama uygulaması (0.14+), Ayarlar > bağlam uzunluğu 64k, sonra Terminal'de: ollama pull <model>
+# Model seçimi (birleşik bellek):
+#   32 GB  -> qwen3-coder:30b   (MoE, hızlı; varsayılan)
+#   32 GB  -> qwen3.6:27b       (daha yeni, daha yavaş)
+#   64 GB+ -> qwen3-coder-next  (en güçlüsü)
+#   16 GB  -> yerel ajan kodlama için zayıf kalır; 'Hepsi Claude' modunu öneririm
+motorlar:
+  qwen-yerel:
+    tur: ollama
+    adres: http://127.0.0.1:11434
+    model: qwen3-coder:30b
+
+# Aynı anda kaç fikir çalışsın. Abonelik limitlerin için 1 önerilir.
+paralel_fikir: 1
+
+# Bir aşamanın onay kurulu (Mimar, PO, Güvenlik...) aynı anda mı çalışsın. false: sırayla.
+paralel_inceleme: true
+
+# Geçici hatada (yoğunluk, ağ) bir adım kaç kez denensin. Kalıcı hatalar (oturum yok,
+# limit doldu, Ollama kapalı) tekrar denenmez, doğrudan sana sorulur.
+deneme_sayisi: 2
+
+# Deneme motorunda her adımın yaklaşık süresi (saniye).
+deneme_gecikme_sn: 1.0

@@ -1,0 +1,5 @@
+.venv/
+calisma/
+__pycache__/
+*.pyc
+.DS_Store

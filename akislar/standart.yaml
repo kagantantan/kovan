@@ -1,0 +1,109 @@
+ad: Standart (BE)
+aciklama: >
+  Arayüzü olmayan işler (komut satırı, servis, hesaplama motoru). Analiz ve kod onay
+  kurulundan geçer: analizi PO + Mimar + Mevzuat, planı Analist + Güvenlik + Mevzuat,
+  kodu testler + Mimar + PO + Güvenlik onaylar. Kodu yazan BE Yazılımcı (hibritte yerel Qwen).
+fikir_butcesi_usd: 8
+
+asamalar:
+  - id: brif
+    ad: Brif
+    ajan: urun-sahibi
+    gorev: Fikri ürün brifine çevir.
+    girdiler: [fikir]
+    cikti: brif
+
+  - id: analiz
+    ad: Analiz
+    ajan: analist
+    gorev: Brifi kurallara, uç durumlara ve hata davranışına aç.
+    girdiler: [fikir, brif]
+    cikti: analiz
+    dogrulama:
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Analiz brifteki her kabul kriterini kapsıyor mu? Kapsam dışına taşan bir şey var mı?
+      - ad: Mimar onayı
+        inceleyen: mimar
+        odak: Kurallar teknik olarak uygulanabilir ve test edilebilir mi? Çelişkili kural var mı?
+      - ad: Mevzuat onayı
+        inceleyen: mevzuat
+        odak: Kişisel veri, rıza, saklama ya da finansal bilgilendirme açısından eksik bir gereksinim var mı?
+    en_fazla_tur: 2
+
+  - id: teknik-plan
+    ad: Teknik plan
+    ajan: mimar
+    gorev: Analizi en sade doğru teknik plana çevir (arayüz yok; yalnızca backend/).
+    girdiler: [brif, analiz]
+    cikti: teknik-plan
+    dogrulama:
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Plan analizdeki tüm kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: Tehdit modeli, girdi doğrulama, gizli bilgi ve kişisel verinin saklanma/loglanma kararları yeterli mi?
+      - ad: Mevzuat onayı
+        inceleyen: mevzuat
+        odak: Veri saklama, loglama ve üçüncü taraf servis kararları uyum açısından sorun yaratıyor mu?
+    en_fazla_tur: 2
+
+  - id: test-senaryolari
+    ad: Test senaryoları
+    ajan: test-analisti
+    gorev: Kabul kriterleri ve uç durumlar için BE test senaryolarını çıkar (arayüz yok).
+    girdiler: [brif, analiz, teknik-plan]
+    cikti: test-senaryolari
+    dogrulama:
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Senaryolar her kabul kriterini ürün gözüyle sınıyor mu?
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Her kural ve uç durum için senaryo var mı, beklenen sonuçlar analizle uyumlu mu?
+    en_fazla_tur: 2
+
+  - id: otomatik-testler
+    ad: Otomatik testler
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: Test senaryolarının BE otomatik testlerini (testler/be/) ve test-be.sh'ı plandaki imzalarla yaz.
+    girdiler: [teknik-plan, test-senaryolari]
+    cikti: test-ozeti
+    yazabilir: [testler, test-be.sh]
+    kilitle: [testler, test-be.sh]
+    dogrulama:
+      - ad: Kapsama onayı
+        inceleyen: test-analisti
+        odak: Her TS-ID'nin otomatik testi var mı ve beklenen sonuçlar senaryolarla uyumlu mu?
+    en_fazla_tur: 2
+
+  - id: be-gelistirme
+    ad: BE geliştirme
+    ajan: be-yazilimci
+    calisma_dizini: kod
+    gorev: Teknik plana uyarak kilitli BE testlerini geçen en sade kodu backend/ altına yaz.
+    girdiler: [teknik-plan, analiz, test-ozeti]
+    cikti: be-notu
+    yazabilir: [backend]
+    dogrulama:
+      - ad: BE testleri
+        komut: bash test-be.sh
+        sure_dk: 5
+      - ad: Mimar onayı
+        inceleyen: mimar
+        odak: Kod plana uygun, sade ve doğru mu? Hard-code, plan dışı karmaşıklık ya da sayısal hassasiyet sorunu var mı?
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Kabul kriterleri karşılanıyor mu? Kullanıcıya görünen çıktı ve hata mesajları doğru ve anlaşılır mı?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: Kodda KRİTİK ya da YÜKSEK seviyede güvenlik açığı var mı?
+    en_fazla_tur: 4
+
+  - id: kabul
+    ad: Kabulün
+    tur: insan
+    soru: Kod, testler ve onay kurulu tamam. İncele; kabul et ya da notunla geri gönder.
+    geri_donus: be-gelistirme

@@ -1,0 +1,48 @@
+ad: Mini
+aciklama: >
+  Küçük işler için 4 aşama: brif, kilitli otomatik testler, BE kodu (testler gerçekten
+  çalıştırılır) ve senin kabulün. Onay kurulu yok, seremoni en az.
+fikir_butcesi_usd: 3
+
+asamalar:
+  - id: brif
+    ad: Brif
+    ajan: urun-sahibi
+    gorev: >
+      Fikri brife çevir. Bu küçük bir iş: brif de kısa olsun (en fazla yarım sayfa,
+      en fazla 5 kabul kriteri).
+    girdiler: [fikir]
+    cikti: brif
+
+  - id: otomatik-testler
+    ad: Otomatik testler
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: >
+      Brifteki kabul kriterleri için BE testlerini (testler/be/) ve test-be.sh'ı yaz.
+      Bu akışta mimar ve test analisti yok: backend/ altındaki modül adını ve fonksiyon
+      imzalarını sen belirle ve özette açıkça yaz.
+    girdiler: [fikir, brif]
+    cikti: test-ozeti
+    yazabilir: [testler, test-be.sh]
+    kilitle: [testler, test-be.sh]
+
+  - id: be-gelistirme
+    ad: BE geliştirme
+    ajan: be-yazilimci
+    calisma_dizini: kod
+    gorev: Kilitli testleri geçen en sade backend kodunu backend/ altına yaz.
+    girdiler: [brif, test-ozeti]
+    cikti: be-notu
+    yazabilir: [backend]
+    dogrulama:
+      - ad: BE testleri
+        komut: bash test-be.sh
+        sure_dk: 5
+    en_fazla_tur: 4
+
+  - id: kabul
+    ad: Kabulün
+    tur: insan
+    soru: Kod ve testler hazır. İncele; kabul et ya da notunla geri gönder.
+    geri_donus: be-gelistirme

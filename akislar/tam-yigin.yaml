@@ -1,0 +1,162 @@
+ad: Tam yığın (FE + BE)
+aciklama: >
+  Arayüzü olan işler. UX tıklanabilir prototip ve arayüz sözleşmesi üretir; test analisti
+  FE ve BE senaryolarını, test otomasyon bunların otomatik testlerini yazar (kilitlenir).
+  Kodu BE ve FE yazılımcıları kendi klasörlerinde yazar (hibritte yerel Qwen); her
+  aşama onay kurulundan geçer.
+fikir_butcesi_usd: 12
+
+asamalar:
+  - id: brif
+    ad: Brif
+    ajan: urun-sahibi
+    gorev: Fikri ürün brifine çevir. Arayüz ihtiyacını açıkça belirt.
+    girdiler: [fikir]
+    cikti: brif
+
+  - id: analiz
+    ad: Analiz
+    ajan: analist
+    gorev: Brifi kurallara, uç durumlara ve hata davranışına aç; kullanıcının göreceği hata durumlarını da yaz.
+    girdiler: [fikir, brif]
+    cikti: analiz
+    dogrulama:
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Analiz brifteki her kabul kriterini kapsıyor mu? Kapsam dışına taşan bir şey var mı?
+      - ad: Mimar onayı
+        inceleyen: mimar
+        odak: Kurallar teknik olarak uygulanabilir ve test edilebilir mi? Çelişkili kural var mı?
+      - ad: Mevzuat onayı
+        inceleyen: mevzuat
+        odak: Kişisel veri, rıza, saklama ya da finansal bilgilendirme açısından eksik bir gereksinim var mı?
+    en_fazla_tur: 2
+
+  - id: ux-tasarim
+    ad: UX tasarım
+    ajan: ux-tasarimci
+    calisma_dizini: kod
+    gorev: Akışları, ekranları, durumları ve arayüz sözleşmesini tasarla; tıklanabilir prototipi tasarim/ altına yaz.
+    girdiler: [brif, analiz]
+    cikti: ux-ozeti
+    yazabilir: [tasarim]
+    kilitle: [tasarim]
+    dogrulama:
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Akışlar ve ekranlar brifi karşılıyor mu? Metinler kullanıcı için anlaşılır mı? Kapsam dışı ekran var mı?
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Analizdeki her hata durumu ve uç durum bir ekran durumu olarak tasarlanmış mı?
+      - ad: Mevzuat onayı
+        inceleyen: mevzuat
+        odak: Aydınlatma/rıza metinleri, önceden işaretli kutu olmaması ve temel erişilebilirlik tasarımda var mı?
+    en_fazla_tur: 2
+
+  - id: teknik-plan
+    ad: Teknik plan
+    ajan: mimar
+    gorev: Analizi ve UX tasarımını en sade doğru teknik plana çevir (backend/ ve frontend/). Arayüz sözleşmesini koru.
+    girdiler: [brif, analiz, ux-ozeti]
+    cikti: teknik-plan
+    dogrulama:
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Plan analizdeki tüm kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: Tehdit modeli, girdi doğrulama (FE ve BE), XSS, gizli bilgi ve kişisel veri kararları yeterli mi?
+      - ad: Mevzuat onayı
+        inceleyen: mevzuat
+        odak: Veri saklama, loglama ve üçüncü taraf servis kararları uyum açısından sorun yaratıyor mu?
+    en_fazla_tur: 2
+
+  - id: test-senaryolari
+    ad: Test senaryoları
+    ajan: test-analisti
+    gorev: Kabul kriterleri, uç durumlar ve ekran durumları için FE ve BE test senaryolarını çıkar.
+    girdiler: [brif, analiz, ux-ozeti, teknik-plan]
+    cikti: test-senaryolari
+    dogrulama:
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Senaryolar her kabul kriterini ürün gözüyle sınıyor mu?
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Her kural, uç durum ve hata ekranı için senaryo var mı, beklenen sonuçlar analizle uyumlu mu?
+    en_fazla_tur: 2
+
+  - id: otomatik-testler
+    ad: Otomatik testler
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: >
+      Test senaryolarının otomatik testlerini yaz: BE testleri testler/be/ + test-be.sh,
+      FE uçtan uca testleri testler/fe/ + test-fe.sh (arayüz sözleşmesindeki kimliklerle).
+    girdiler: [teknik-plan, test-senaryolari, ux-ozeti]
+    cikti: test-ozeti
+    yazabilir: [testler, test-be.sh, test-fe.sh]
+    kilitle: [testler, test-be.sh, test-fe.sh]
+    dogrulama:
+      - ad: Kapsama onayı
+        inceleyen: test-analisti
+        odak: Her TS-ID'nin (FE ve BE) otomatik testi var mı ve beklenen sonuçlar senaryolarla uyumlu mu?
+    en_fazla_tur: 2
+
+  - id: be-gelistirme
+    ad: BE geliştirme
+    ajan: be-yazilimci
+    calisma_dizini: kod
+    gorev: Teknik plana uyarak kilitli BE testlerini geçen en sade kodu backend/ altına yaz.
+    girdiler: [teknik-plan, analiz, test-ozeti]
+    cikti: be-notu
+    yazabilir: [backend]
+    dogrulama:
+      - ad: BE testleri
+        komut: bash test-be.sh
+        sure_dk: 5
+      - ad: Mimar onayı
+        inceleyen: mimar
+        odak: Kod plana uygun, sade ve doğru mu? Hard-code, plan dışı karmaşıklık ya da sayısal hassasiyet sorunu var mı?
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Kabul kriterleri karşılanıyor mu? Hata mesajları doğru ve anlaşılır mı?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: Kodda KRİTİK ya da YÜKSEK seviyede güvenlik açığı var mı?
+    en_fazla_tur: 4
+
+  - id: fe-gelistirme
+    ad: FE geliştirme
+    ajan: fe-yazilimci
+    calisma_dizini: kod
+    gorev: UX tasarımına, arayüz sözleşmesine ve plana uyarak kilitli FE testlerini geçen arayüzü frontend/ altına yaz.
+    girdiler: [teknik-plan, ux-ozeti, test-ozeti, be-notu]
+    cikti: fe-notu
+    yazabilir: [frontend]
+    dogrulama:
+      - ad: FE testleri
+        komut: bash test-fe.sh
+        sure_dk: 10
+      - ad: Mimar onayı
+        inceleyen: mimar
+        odak: Kod plana uygun ve sade mi? FE↔BE arayüzü plandaki gibi mi?
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Kullanıcı kabul kriterlerini ekranda gerçekleştirebiliyor mu? Metinler doğru mu?
+      - ad: UX onayı
+        inceleyen: ux-tasarimci
+        odak: Ekranlar, durumlar, metinler ve erişilebilirlik tasarıma uygun mu?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: XSS, güvensiz HTML ekleme ya da istemcide gizli bilgi gibi KRİTİK/YÜKSEK açık var mı?
+      - ad: Mevzuat onayı
+        inceleyen: mevzuat
+        odak: Rıza/aydınlatma metinleri ve erişilebilirlik uygulamada da doğru mu?
+    en_fazla_tur: 4
+
+  - id: kabul
+    ad: Kabulün
+    tur: insan
+    soru: Arayüz, backend, testler ve onay kurulları tamam. Prototipi ve uygulamayı incele; kabul et ya da geri gönder.
+    geri_donus: fe-gelistirme
