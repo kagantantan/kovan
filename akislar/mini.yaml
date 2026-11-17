@@ -38,11 +38,11 @@ asamalar:
     dogrulama:
       - ad: BE testleri
         komut: bash test-be.sh
-        sure_dk: 5
+        sure_dk: 10
     en_fazla_tur: 4
 
   - id: kabul
-    ad: Kabulün
+    ad: Kabul
     tur: insan
     soru: Kod ve testler hazır. İncele; kabul et ya da notunla geri gönder.
     geri_donus: be-gelistirme

@@ -90,7 +90,7 @@ asamalar:
     dogrulama:
       - ad: BE testleri
         komut: bash test-be.sh
-        sure_dk: 5
+        sure_dk: 10
       - ad: Mimar onayı
         inceleyen: mimar
         odak: Kod plana uygun, sade ve doğru mu? Hard-code, plan dışı karmaşıklık ya da sayısal hassasiyet sorunu var mı?
@@ -103,7 +103,7 @@ asamalar:
     en_fazla_tur: 4
 
   - id: kabul
-    ad: Kabulün
+    ad: Kabul
     tur: insan
     soru: Kod, testler ve onay kurulu tamam. İncele; kabul et ya da notunla geri gönder.
     geri_donus: be-gelistirme

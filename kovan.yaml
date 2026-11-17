@@ -42,3 +42,10 @@ deneme_sayisi: 2
 
 # Deneme motorunda her adımın yaklaşık süresi (saniye).
 deneme_gecikme_sn: 1.0
+
+# İnsan döngüde: ajanlar karar veremediklerinde sana seçenekli soru sorar (önerdikleri seçenek ilk sırada,
+# her zaman kendi cevabını da yazabilirsin). Cevapların karar defterine yazılır ve sonraki bütün ajanlar görür.
+ajan_sorulari: true
+
+# Bir aşamada en fazla kaç kez soru gelsin. Dolunca ajanlara "VARSAYIM yazıp devam et" denir.
+en_fazla_soru_turu: 2

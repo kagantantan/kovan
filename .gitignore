@@ -1,5 +1,5 @@
-.venv/
+node_modules/
+arayuz/dist/
 calisma/
-__pycache__/
-*.pyc
 .DS_Store
+*.log

@@ -114,7 +114,7 @@ asamalar:
     dogrulama:
       - ad: BE testleri
         komut: bash test-be.sh
-        sure_dk: 5
+        sure_dk: 10            # ilk çalıştırmada npm paketleri iner
       - ad: Mimar onayı
         inceleyen: mimar
         odak: Kod plana uygun, sade ve doğru mu? Hard-code, plan dışı karmaşıklık ya da sayısal hassasiyet sorunu var mı?
@@ -137,7 +137,7 @@ asamalar:
     dogrulama:
       - ad: FE testleri
         komut: bash test-fe.sh
-        sure_dk: 10
+        sure_dk: 15            # ilk çalıştırmada npm paketleri ve Playwright'ın chromium'u iner
       - ad: Mimar onayı
         inceleyen: mimar
         odak: Kod plana uygun ve sade mi? FE↔BE arayüzü plandaki gibi mi?
@@ -156,7 +156,7 @@ asamalar:
     en_fazla_tur: 4
 
   - id: kabul
-    ad: Kabulün
+    ad: Kabul
     tur: insan
     soru: Arayüz, backend, testler ve onay kurulları tamam. Prototipi ve uygulamayı incele; kabul et ya da geri gönder.
     geri_donus: fe-gelistirme
