@@ -92,7 +92,7 @@ describe("Replatform uç noktaları", () => {
     const k = await kovanOlustur();
     const post = (payload: object) => k.app.inject({ method: "POST", url: "/api/fikirler", headers: HOST, payload });
     const durum = (await k.app.inject({ url: "/api/durum", headers: HOST })).json();
-    expect(durum.hedef_yiginlar.map((h: { id: string }) => h.id)).toEqual(["node-ts", "java21-spring-maven", "java25-spring-maven", "java21-temporal"]);
+    expect(durum.hedef_yiginlar.map((h: { id: string }) => h.id)).toEqual(["node-ts", "java21-spring-maven", "java25-spring-maven", "java21-temporal", "java17-spring-batch"]);
     expect(durum.yerel_motor).toBe("qwen-yerel");
     expect(durum.ornek_kaynak).toBeNull();                        // geçici kökte ornekler/ yok
     const akislar = (await k.app.inject({ url: "/api/akislar", headers: HOST })).json();

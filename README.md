@@ -434,6 +434,7 @@ Yeni fikirde seçersen karar defterine yazılır ve bütün ajanlar ona uyar. Se
 | Java 21 + Spring Boot (Maven) | yaygın LTS; para ve oran BigDecimal, iş mantığı saf domain'de (hexagonal) |
 | Java 25 + Spring Boot (Maven) | yeni LTS'e geçtiysen |
 | Java 21 + Spring Boot + Temporal | iş uzun, çok adımlı ve kesintide kaldığı yerden sürmesi gerekiyorsa |
+| Java 17 + Spring Batch (Oracle) | milyonlarca kayıtlı gün sonu işi; chunk, partitioning ve yeniden başlatma Spring Batch'te, kararları mimar rakamla verir |
 | Node.js + TypeScript | Kovan'ın varsayılanı |
 | Başka bir yığın | serbest metin, ör. "Java 17 + Spring Boot 3, Gradle" |
 
@@ -509,6 +510,61 @@ Ollama değişkenlerini (`ANTHROPIC_BASE_URL` vb.) `~/.zshrc`'ye ya da `~/.claud
 
 Kurumunun kendi LLM servisi (ör. vLLM ya da bir ağ geçidi arkasında Qwen) ve bir API anahtarı varsa bütün ajanları ona bağlayabilirsin. Hiçbir çağrı Claude'a gitmez ve Claude Code gerekmez: `tur: openai` motorunda ajanlar **Kovan'ın kendi ajan döngüsüyle** çalışır.
 
+**Ollama gerekmez.** Ollama yalnızca Hibrit modda, Kovan'ı kendi makinende yerel bir Qwen'le denemek içindir. OpenAI uyumlu `/v1/chat/completions` sunan herhangi bir servis (kurumun LLM'i, iç ağdaki bir vLLM, bir ağ geçidi) adresi ve anahtarıyla doğrudan bağlanır. Kovan'ın çalıştığı makinede yalnızca Node.js ve npm bağımlılıkları gerekir; Docker, Ollama ve Claude Code gerekmez.
+
+```
+Tarayıcı ──► Kovan (127.0.0.1:8765) ──► Kovan ajanı (alt süreç) ──HTTPS + anahtar──► https://llm.kurum.local/v1
+                    │                          │
+                    └── calisma/F-xxx/         └── araçlar: Read, Write, Edit, Glob, Grep, Bash (izinli kalıplar)
+```
+
+### Kısaca: beş adım
+1. Ayar dosyasını repo dışına koy: `ornekler/kurum-ayar.ornek.yaml` → `~/.kovan/kovan.yaml`.
+2. İçinde `adres`, `model` ve anahtarın **yerini** yaz (`anahtar_degiskeni` ya da `anahtar_dosyasi`); anahtarın kendisini değil.
+3. Anahtar başlığı `Authorization: Bearer` değilse `anahtar_basligi` yaz (ör. `api-key`, `x-api-key`).
+4. Bağlantıyı aşağıdaki gibi elle dene, sonra `npm start -- --ayar ~/.kovan/kovan.yaml`.
+5. Üst çubukta motor **hazır** görünsün; önce Deneme, sonra Mini akışla küçük bir fikir koş.
+
+En küçük ayar:
+```yaml
+claude: false
+modlar: [yerel, deneme]
+motor: yerel
+yerel_motor: kurum-llm
+motorlar:
+  kurum-llm:
+    tur: openai
+    adres: https://llm.kurum.local/v1
+    model: qwen3-coder                 # GET /v1/models'taki id
+    anahtar_degiskeni: KURUM_LLM_ANAHTAR
+    # anahtar_basligi: api-key         # Bearer değilse
+    # ca_dosyasi: ~/.kovan/kurum-kok.pem
+ajanlar:
+  "*":
+    motor: kurum-llm
+```
+
+### Bağlantıyı elle denemek
+Kovan'ı açmadan önce adresin, anahtarın ve tool calling'in çalıştığını gör:
+```bash
+curl -s https://llm.kurum.local/v1/models -H "Authorization: Bearer $KURUM_LLM_ANAHTAR"
+```
+```bash
+curl -s https://llm.kurum.local/v1/chat/completions -H "Authorization: Bearer $KURUM_LLM_ANAHTAR" -H "Content-Type: application/json" -d '{"model":"qwen3-coder","messages":[{"role":"user","content":"README.md dosyasını oku"}],"tools":[{"type":"function","function":{"name":"Read","parameters":{"type":"object","properties":{"file_path":{"type":"string"}},"required":["file_path"]}}}]}'
+```
+İkinci yanıtta `tool_calls` görünmeli. Görünmüyorsa sunucuda tool calling kapalıdır (aşağıdaki notlara bak); Kovan yine de metin biçimine geçerek sürer, ama daha az güvenilir.
+
+### Kuruma sorulacaklar
+| Soru | Ayardaki karşılığı |
+|---|---|
+| API OpenAI uyumlu mu (`/v1/chat/completions`, `GET /v1/models`)? | `adres` (`/v1` dahil) |
+| Tool calling açık mı? | açık değilse `arac_bicimi: metin` |
+| Anahtar hangi başlıkta? | `anahtar_basligi` |
+| Model adı ve bağlam penceresi? | `model`, `baglam_token` |
+| İç ağ sertifikası kurumun kendi kökünden mi? | `ca_dosyasi` |
+| Ağ geçidinin zaman aşımı kaç saniye? | ajanların `sure_dk`'sı bundan kısa olmamalı |
+| Java hedefinde Maven bağımlılıkları nereden iner? | kurumun Maven aynası (`~/.m2/settings.xml`) |
+
 ### Nasıl çalışıyor
 - Model, OpenAI uyumlu `/chat/completions` üzerinden araç çağırır: Read, Write, Edit, MultiEdit, Glob, Grep, Bash. Kovan araçları çalıştırır, sonucu modele verir; model araç çağırmadan yanıt verince o yanıt ajanın çıktısıdır.
 - Araç adları ve izin kalıpları (`izinli_komutlar: "Bash(npm test:*)"`) Claude Code'unkiyle aynı, ajan kartları değişmez.
@@ -543,6 +599,7 @@ Dış dosyada yazdığın her üst anahtar repodaki `kovan.yaml`'ın aynı anaht
 - Kovan'ın çalıştığı makinede Node.js 20.19+ ya da 22.12+ ve `bash` gerekir (test betikleri ve Bash aracı). Windows'ta Git Bash ya da WSL gerekir; denenmedi.
 - İstekler akışsız (streaming yok). Ağ geçidi uzun yanıtları belli bir sürede kesiyorsa ajan yarıda kalır; geçidin zaman aşımını ajan sürelerine göre ayarla.
 - Kurum LLM'inde maliyet 0 görünür; token sayıları adım adım tutulur.
+- Kovan'ın kendi Read aracı metin dosyalarını okur. Replatform kaynağında analiz dokümanı `.docx` (HTML'e çevrilir), `.md`, `.txt`, `.html` ya da `.csv` olmalı; `.pdf`, `.xlsx` ve görseller bu motorda okunamaz.
 
 ---
 

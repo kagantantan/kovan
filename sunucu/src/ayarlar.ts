@@ -22,6 +22,8 @@ export const HEDEF_YIGINLAR: HedefYigin[] = [
     aciklama: "Java 25 (LTS), Spring Boot (Java 25'i destekleyen güncel kararlı sürüm), Maven; testler JUnit 5 + AssertJ. Para ve oranlar BigDecimal (yuvarlama kuralı açık). İş mantığı saf Java domain katmanında; Spring, veritabanı ve zamanlayıcı yalnızca adaptörlerde (hexagonal)." },
   { id: "java21-temporal", ad: "Java 21 + Spring Boot + Temporal",
     aciklama: "Java 21, Spring Boot, Maven, Temporal Java SDK. Gün sonu akışı bir Temporal workflow'u, her adım idempotent bir activity (yeniden deneme ve zaman aşımı açıkça tanımlı); hesaplama saf Java domain katmanında, activity'ler yalnızca onu çağırır. Testler JUnit 5 + AssertJ; workflow testleri Temporal test ortamıyla (TestWorkflowEnvironment)." },
+  { id: "java17-spring-batch", ad: "Java 17 + Spring Batch (Oracle)",
+    aciklama: "Java 17, Spring Boot 3 + Spring Batch 5, Maven, Oracle. Yüksek hacimli gün sonu işi chunk tabanlı step'lerle; partitioning, paralel step ve chunk boyutu mimarın kararı, beklenen hacim ve süre hedefiyle rakamla gerekçelendirilir. Büyük toplu güncellemeler JDBC batch ya da küme tabanlı SQL ile, satır satır değil. JobRepository ile yeniden başlatılabilir: kesintide kaldığı chunk ya da partition'dan sürer; aynı iş tarihi iki kez işlenmez (iş tarihi job parametresi). Para ve oranlar BigDecimal (yuvarlama kuralı açık). İş mantığı saf Java domain katmanında; reader, processor ve writer yalnızca onu çağıran adaptörler. Testler JUnit 5 + AssertJ + spring-batch-test; test veritabanı H2 (Oracle modu), Docker gerekmez; ölçekli verim testi sentetik veriyle." },
 ];
 export type { Mod };
 

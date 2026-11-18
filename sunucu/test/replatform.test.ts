@@ -191,8 +191,8 @@ describe("Replatform akışı", () => {
       "p2-is-kalemi:yesil", "p3-is-kalemi:yesil", "birlestirme:yesil",
     ]);
     // İlk turdaki kırmızı: yazılımcı dokümandaki 360'ı kullandı, kilitli test 365 bekliyordu
-    expect(d.adimlar.find((a) => a.asama_id === "p1-is-kalemi" && a.durum === "kirmizi")!.ozet).toMatch(/# fail 1/);
-    expect(d.adimlar.find((a) => a.asama_id === "birlestirme" && a.tip === "kontrol")!.ozet).toMatch(/# tests 6 · # pass 6/);
+    expect(d.adimlar.find((a) => a.asama_id === "p1-is-kalemi" && a.durum === "kirmizi")!.ozet).toMatch(/[#ℹ] fail 1/);
+    expect(d.adimlar.find((a) => a.asama_id === "birlestirme" && a.tip === "kontrol")!.ozet).toMatch(/[#ℹ] tests 6 · [#ℹ] pass 6/);
     expect(dosya(k, fid, "kod/backend/src/faiz.mjs")).toContain("export const GUN_ESASI = 365;");
     expect(varMi(k, fid, "kod/testler/be/entegrasyon/altin.test.mjs")).toBe(true);
     expect(ozet(path.join(k.calisma, fid, "kod", PKB))).toBe(ozet(path.join(ORNEK, "KART_REESKONT_GUNSONU.pkb")));   // kaynak el değmeden durur
