@@ -6,7 +6,7 @@ Ajanlar takıldıklarında **önce kendi aralarında oy veriyor**; oybirliği ç
 
 Sıfırdan bir ürün yerine **var olan bir sistemi de yeniden yazdırabilirsin (replatform)**: eski kodu ve analiz dokümanını verirsin; ekip önce sistemin bugün gerçekte ne yaptığını koda atıflarla çıkarır, doküman ile kod arasındaki farkları karara bağlar (anlaşamazsa sana sorar), sonra temiz bir mimariyle ve eski sistemin çıktısıyla karşılaştırarak yeniden yazar. Çıktı, kendi sistemine entegre edeceğin kod ve bir entegrasyon kılavuzudur.
 
-**Hibrit çalışır:** kodu yerelde **Qwen** (Ollama) yazar; analiz, tasarım ve onayları **Claude** yapar. Kod makineden çıkmamalıysa **Hepsi yerel** modu bütün ajanları yerel modelde çalıştırır.
+**Hibrit çalışır:** kodu yerelde **Qwen** (Ollama) yazar; analiz, tasarım ve onayları **Claude** yapar. Kod makineden çıkmamalıysa **Hepsi yerel** modu bütün ajanları yerel modelde çalıştırır. Kurumun kendi LLM'i varsa (OpenAI uyumlu bir API ve bir anahtar) bütün ajanlar ona bağlanır; adres, anahtarın yeri ve ajan ayarları repo dışındaki bir ayar dosyasından gelir, Claude Code da gerekmez.
 **Qwen yazar, Claude onaylar, testler karar verir, sen yön verirsin.**
 
 ![Ekip anlaşamadı: Mevzuat'ın sorusu oylarla birlikte geliyor](docs/soru-karti.png)
@@ -22,12 +22,13 @@ Sıfırdan bir ürün yerine **var olan bir sistemi de yeniden yazdırabilirsin 
 6. [Replatform: mevcut sistemi yeniden yazmak](#replatform-mevcut-sistemi-yeniden-yazmak)
 7. [Hızlı başlangıç](#hızlı-başlangıç)
 8. [Hibrit için yerel Qwen kurulumu](#hibrit-için-yerel-qwen-kurulumu)
-9. [Ekip ve onay kurulları](#ekip-ve-onay-kurulları)
-10. [Üretilen uygulamanın yığını](#üretilen-uygulamanın-yığını)
-11. [Büyütmek](#büyütmek)
-12. [Kovan'ı geliştirmek](#kovanı-geliştirmek)
-13. [Sorun giderme](#sorun-giderme)
-14. [Yol haritası](#yol-haritası)
+9. [Kurum içi LLM ile çalıştırmak](#kurum-içi-llm-ile-çalıştırmak)
+10. [Ekip ve onay kurulları](#ekip-ve-onay-kurulları)
+11. [Üretilen uygulamanın yığını](#üretilen-uygulamanın-yığını)
+12. [Büyütmek](#büyütmek)
+13. [Kovan'ı geliştirmek](#kovanı-geliştirmek)
+14. [Sorun giderme](#sorun-giderme)
+15. [Yol haritası](#yol-haritası)
 
 ---
 
@@ -89,6 +90,7 @@ Kovan tek bir Node.js sürecidir (TypeScript, `tsx` ile derlemeden çalışır).
 | Dosya | Sorumluluk |
 |---|---|
 | `sunucu/src/orkestrator.ts` | Durum makinesi. Aşamaları sırayla yürütür; Üret → Doğrula döngüsü, paralel onay kurulu, ortak karar (oylama), ajan soruları ve karar defteri, iş kalemlerinin açılması, gelişim önerileri ve yeni sürüm, yazma alanı ve kilit denetimi, süre/bütçe/tur sınırları, yeniden başlatmada kurtarma |
+| `sunucu/src/uyumlu.ts`, `sunucu/src/ajan/` | OpenAI uyumlu motor (kurum içi LLM) ve Kovan'ın kendi ajan döngüsü: araçlar (Read, Write, Edit, MultiEdit, Glob, Grep, Bash), yol hapsi, komut izinleri, Qwen'in metin biçimindeki araç çağrıları; her çağrı ayrı süreçte |
 | `sunucu/src/kaynak.ts` | Replatform: mevcut sistemin kaynaklarını içe alır (kopya, atlananlar, Word → HTML, Windows-1254/UTF-16 → UTF-8, zip, sınırlar), kaynak envanteri, kod atıfları denetimi |
 | `sunucu/src/plan.ts` | `kovan-plan` ve `kovan-gelisim` bloklarını okur ve denetler; kalem şablonunu her kalem için somut aşamalara açar |
 | `sunucu/src/motor.ts` | Motorlar. `ClaudeMotoru` (abonelik), `OllamaMotoru` (aynı harness + yerel model), `DenemeMotoru` (token harcamaz). `claude --help`'ten bayrak tespiti, JSON çözümleme, kalıcı/geçici hata ayrımı, soru bloğu ayrıştırma |
@@ -216,6 +218,7 @@ Derin planlama bilerek pahalı: kod yazılmadan önce kapsam, analiz, plan ve te
 | **Salt okunur kaynak** | kilit + salt okunur aşama | Eski sistemin kopyasına kimse yazamaz; Mevcut Sistem Analisti hiçbir dosyaya yazamaz, yazarsa geri alınır |
 | **Kod atıfları** | atıf denetimi | Mevcut sistem analizindeki her `kaynak/<dosya>:<satır>` gerçek bir dosya ve satıra gitmeli; uydurma atıf onay kuruluna gitmeden geri döner |
 | **Hepsi yerel** | motor seçimi | Oylar ve onaylar dahil hiçbir çağrı buluta gitmez; yerel motor yoksa iş durur, Claude'a düşülmez |
+| **Kurum LLM'inde araçlar** | Kovan'ın ajan döngüsü | Yollar çalışma dizinine hapsedilir (`..`, mutlak yol, sembolik bağ); Bash yalnızca kartın izinli kalıplarına uyan komutları çalıştırır, `$( )` reddedilir; API anahtarı istemde, günlükte ve Bash'in ortamında yok |
 | **Plan biçimi** | `kovan-plan` denetimi | Kalem kimlikleri, yazılımcı, bağımlılık ve döngü sistemce denetlenir; bozuk plan onay kuruluna gitmeden düzeltmeye döner |
 | Süre, bütçe, tur | orkestratör | Takılan adım durdurulur; sınırda karar sana kalır |
 | Önizleme yalıtımı | sandbox CSP | Ajanın yazdığı HTML, Kovan'a senin adına istek atamaz |
@@ -446,7 +449,7 @@ Java'da ajanlar Maven ya da Gradle ile derler ve test eder; ilk koşumda bağım
 | Hibrit | analiz ve onay ajanları üzerinden Claude'a gider | kodu yerel model yazar |
 | Hepsi Claude | Claude'a gider | |
 
-Kurum içi bir sistemse önce kurumunun politikasına bak. Buluta gitmemesi gerekiyorsa Hepsi yerel'i kullan ya da adları ve verileri anonimleştirilmiş bir kopyayla çalış. Hepsi yerel daha yavaştır ve yerel model analizde Claude kadar güçlü değildir; daha çok düzeltme turu ve daha çok soru bekle.
+Kurum içi bir sistemse önce kurumunun politikasına bak. Buluta gitmemesi gerekiyorsa Hepsi yerel'i kullan (kurumun kendi LLM'i varsa bkz. [Kurum içi LLM ile çalıştırmak](#kurum-içi-llm-ile-çalıştırmak)) ya da adları ve verileri anonimleştirilmiş bir kopyayla çalış. Hepsi yerel daha yavaştır ve yerel model analizde Claude kadar güçlü değildir; daha çok düzeltme turu ve daha çok soru bekle.
 
 ### Örnekle dene
 `ornekler/reeskont-eski/` kurgusal bir eski sistemdir: kart reeskont gün sonu PL/SQL paketi, Word analiz dokümanı ve örnek veri. Bilerek iki iz taşır: doküman gün esasını 360 diyor, kod 365 kullanıyor; aynı tarih iki kez çalışırsa çift kayıt oluşur. **Yeni fikir → Örnekle doldur: Kart reeskont gün sonu → Mod: Deneme** ile dene. Mevcut Sistem Analisti farkı satır atfıyla bulur, analist "Gün esası" sorusunu sorar, ekip bölünür ve soru sana gelir; sonunda yeni kod eski sistemin örnek çıktısıyla karşılaştırılır. Deneme motoru gerçek Java yazmaz, seçtiğin yığından bağımsız küçük bir JavaScript örneği üretir.
@@ -499,6 +502,47 @@ Tekrar çalıştırmak güvenlidir; kurulu olanı yeniden kurmaz. Model seçimin
 | 16 GB altı | Yerel ajan kodlaması zayıf kalır. **Hepsi Claude** modunu öneririm. |
 
 Ollama değişkenlerini (`ANTHROPIC_BASE_URL` vb.) `~/.zshrc`'ye ya da `~/.claude/settings.json`'a yazma. Kovan bunları yalnızca yerel ajanların çağrısına koyar, Claude ajanları için temizler. `settings.json`'daki değerler ise Kovan'ın ayarını ezer.
+
+---
+
+## Kurum içi LLM ile çalıştırmak
+
+Kurumunun kendi LLM servisi (ör. vLLM ya da bir ağ geçidi arkasında Qwen) ve bir API anahtarı varsa bütün ajanları ona bağlayabilirsin. Hiçbir çağrı Claude'a gitmez ve Claude Code gerekmez: `tur: openai` motorunda ajanlar **Kovan'ın kendi ajan döngüsüyle** çalışır.
+
+### Nasıl çalışıyor
+- Model, OpenAI uyumlu `/chat/completions` üzerinden araç çağırır: Read, Write, Edit, MultiEdit, Glob, Grep, Bash. Kovan araçları çalıştırır, sonucu modele verir; model araç çağırmadan yanıt verince o yanıt ajanın çıktısıdır.
+- Araç adları ve izin kalıpları (`izinli_komutlar: "Bash(npm test:*)"`) Claude Code'unkiyle aynı, ajan kartları değişmez.
+- Yollar çalışma dizinine hapsedilir; Bash yalnızca kartın izinli kalıplarına uyan komutları çalıştırır. Kovan'ın sınır denetimleri (yazma alanı, kilitli testler) her motorda olduğu gibi burada da geçerli.
+- Her ajan çağrısı ayrı bir süreçte çalışır: **Durdur** dediğinde açtığı komutlarla birlikte kapanır.
+- Sunucu tool calling'i ayrıştırmıyorsa (vLLM'de tool parser kapalıysa) Kovan Qwen'in metin biçimindeki `<tool_call>` bloklarını okur; sunucu `tools`'u reddederse araçları sistem isteminde anlatıp sürdürür.
+
+### Kurulum
+1. `ornekler/kurum-ayar.ornek.yaml`'ı **repo dışına** kopyala (ör. `~/.kovan/kovan.yaml`); adresi ve model adını yaz.
+2. API anahtarını bir ortam değişkenine (`export KURUM_LLM_ANAHTAR=...`) ya da yalnızca senin okuyabildiğin bir dosyaya (`chmod 600`) koy. Anahtarın kendisini ayar dosyasına yazarsan Kovan açılmaz.
+3. `npm start -- --ayar ~/.kovan/kovan.yaml` (ya da `KOVAN_AYAR=... npm start`). Mac'te `Baslat.command`, `~/.kovan/kovan.yaml` varsa onu kendiliğinden okur; çift tıklayınca ortam değişkenleri gelmediği için orada `anahtar_dosyasi` kullan.
+4. Üst çubukta motorun adı **hazır** görünmeli. Kovan açılırken `GET /v1/models` ile adresi, anahtarı ve model adını dener.
+
+### Dış ayar dosyası
+Dış dosyada yazdığın her üst anahtar repodaki `kovan.yaml`'ın aynı anahtarının yerine geçer; yazmadıkların repodaki gibi kalır.
+
+| Anahtar | Ne yapar |
+|---|---|
+| `claude: false` | Claude'a hiç bağlanma; `claude` komutu aranmaz, Hepsi Claude modu kapanır |
+| `modlar: [yerel, deneme]` | arayüzde ve API'de açık modlar |
+| `yerel_motor: kurum-llm` | Hepsi yerel modunun motoru |
+| `motorlar` | repodaki motor listesinin yerine geçer. `tur: openai` alanları: `adres`, `model`, `anahtar_degiskeni` ya da `anahtar_dosyasi`, `anahtar_basligi` (varsayılan `Authorization: Bearer`), `ek_basliklar`, `ca_dosyasi`, `arac_bicimi` (`otomatik`, `openai`, `metin`), `baglam_token`, `sicaklik`, `en_fazla_token`, `en_fazla_tur` |
+| `ajanlar` | kart ayarlarını değiştirir: `"*"` bütün ajanlar, kart kimliği tek ajan. Yalnızca `motor`, `model`, `yerel_model` (o motordaki model), `sure_dk`, `butce_usd`, `efor`. Araçlar, izinler ve sistem promptu kartta kalır; yetki dışarıdan genişletilmez |
+
+### Sunucu tarafı için notlar
+- **Tool calling:** vLLM'de Qwen3-Coder için sunucu `--enable-auto-tool-choice --tool-call-parser qwen3_coder` ile açılmalı. Açık değilse Kovan metin biçimine geçer, ama yerel tool calling daha güvenilir.
+- **Bağlam:** ajan istemleri belgeleri ve kararları taşır; en az 32k, tercihen 64k ve üstü bağlam ver, `baglam_token`'ı ona göre yaz. Eski araç çıktıları bu sınıra göre kısaltılır.
+- **İç ağ HTTPS'i:** sertifika kurumun kendi kök sertifikasıyla imzalıysa `ca_dosyasi` ile ver (varsayılan köklere eklenir).
+- **Model adları:** `model` ve ajanların `yerel_model` değeri `GET /v1/models`'taki `id` ile aynı olmalı.
+
+### Sınırlar
+- Kovan'ın çalıştığı makinede Node.js 20.19+ ya da 22.12+ ve `bash` gerekir (test betikleri ve Bash aracı). Windows'ta Git Bash ya da WSL gerekir; denenmedi.
+- İstekler akışsız (streaming yok). Ağ geçidi uzun yanıtları belli bir sürede kesiyorsa ajan yarıda kalır; geçidin zaman aşımını ajan sürelerine göre ayarla.
+- Kurum LLM'inde maliyet 0 görünür; token sayıları adım adım tutulur.
 
 ---
 
@@ -568,7 +612,9 @@ Yeni fikirde bir **hedef yığın** seçersen (Java 21 + Spring Boot vb., bkz. [
 | `npm test` | Vitest: akışlar, sınırlar, motorlar, HTTP güvenliği |
 | `npm run typecheck` | Sunucu ve arayüz için TypeScript denetimi |
 
-Testler gerçek `claude`'u çağırmaz: `sunucu/test/yardimci/sahte-claude.mjs` gerçek CLI'ın JSON çıktısını taklit eder, yerel motor testleri küçük bir sahte Ollama sunucusuyla koşar.
+Testler gerçek `claude`'u ya da bir LLM'i çağırmaz: `sunucu/test/yardimci/sahte-claude.mjs` gerçek CLI'ın JSON çıktısını taklit eder; yerel motor testleri sahte bir Ollama, kurum LLM'i testleri sahte bir OpenAI uyumlu sunucuyla koşar.
+
+Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişisel notların için `CLAUDE.local.md` aç (repoya girmez).
 
 ---
 
@@ -588,6 +634,11 @@ Testler gerçek `claude`'u çağırmaz: `sunucu/test/yardimci/sahte-claude.mjs` 
 | Ajanlar çok soru soruyor | Ortak karar açık mı (`ortak_karar.acik`)? `en_fazla_soru_turu`'nu düşür ya da `ajan_sorulari: false` yap |
 | Ekip hep anlaşamıyor, sorular bana geliyor | `ortak_karar.kural: cogunluk` yap ya da kurula üye ekle (`ortak_karar.kurul`) |
 | "Teslim planı okunamadı" | Proje Yöneticisi `kovan-plan` bloğunu bozuk yazmış; "Notumla geri gönder" ile teslim planına döndür |
+| "API anahtarı yok: ... ortam değişkeni boş" | Kovan'ı başlattığın kabukta değişkeni ayarla. Finder'dan çift tıklayınca kabuk ayarları gelmez; `anahtar_dosyasi` kullan |
+| "API anahtarı reddedildi (HTTP 401)" | Anahtarı ve `anahtar_basligi`'nı kontrol et (ör. ağ geçidi `api-key` ya da `x-api-key` bekliyor olabilir) |
+| "sertifikası doğrulanamadı" | İç ağ sertifikası kurumun kök sertifikasıyla imzalı: `ca_dosyasi` ile PEM dosyasını ver |
+| "Model sunucuda yok" | `model` değeri `GET /v1/models`'taki `id` ile birebir aynı olmalı |
+| Kurum LLM'inde ajan araç çağırmıyor, düz metin yazıyor | Sunucuda tool calling kapalı olabilir; `arac_bicimi: metin` dene ya da vLLM'i `--enable-auto-tool-choice --tool-call-parser qwen3_coder` ile aç |
 | "Kaynak çok büyük" | Yalnızca taşınacak işin klasörlerini ver; sınır 5.000 dosya, toplam 200 MB |
 | "Kaynak atıfları: GEÇERSİZ" | Analist olmayan bir dosyaya ya da satıra atıf vermiş; sistem aşamayı onay kuruluna göndermeden düzeltmeye döndürür. Tekrarlıyorsa tur sınırında karar ver |
 | Hepsi yerel'de analiz zayıf, tur sınırına takılıyor | Daha büyük yerel model (32 GB+ bellekte `qwen3-coder:30b`), daha küçük kaynak (tek iş), akışta `en_fazla_tur`'u artır |
@@ -610,6 +661,7 @@ Kullanım sütunu Claude Code'un tahminidir. Abonelikte faturalanmaz ama kullan�
 - [x] Tek tık Ollama kurulumu
 - [x] Replatform: mevcut sistemi koda atıflarla anlama, eşdeğerlik onayı, altın test, entegrasyon kılavuzu
 - [x] Hepsi yerel modu: kod ve belgeler makineden çıkmaz
+- [x] Kurum içi LLM: OpenAI uyumlu motor, Kovan'ın kendi ajan döngüsü, repo dışından ayar dosyası
 - [ ] Fikir başına git deposu: tur tur diff ve geri alma
 - [ ] Deterministik güvenlik taramaları onay kurulundan önce (`npm audit`, `semgrep`, `gitleaks`)
 - [ ] Qwen Code motoru: Qwen modellerini kendi harness'ında çalıştırma seçeneği

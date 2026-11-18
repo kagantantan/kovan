@@ -20,21 +20,23 @@ function MotorDurumu({ durum }: { durum: DurumYaniti | null }) {
     <>
       {motorlar.map(([ad, m]) => {
         const tur = m.yerel ? "yerel" : "claude";
-        const ad_ = m.yerel ? `Yerel (${m.model ?? ad})` : "Claude";
+        const kurum = m.tur === "openai";
+        const ad_ = kurum ? `${ad} (${m.model ?? "-"})` : m.yerel ? `Yerel (${m.model ?? ad})` : "Claude";
         return (
           <details key={ad} className={`motor-durumu${m.hazir ? "" : " motor-durumu--degil"}`}>
             <summary title={m.hazir ? `${ad_} hazır` : `${ad_} hazır değil`}>
               <span className={`motor-nokta motor-nokta--${tur}${m.hazir ? "" : " motor-nokta--yok"}`} />
-              {m.yerel ? "Yerel" : "Claude"}
+              {kurum ? ad : m.yerel ? "Yerel" : "Claude"}
               <span className="motor-durumu-hal">{m.hazir ? "hazır" : "hazır değil"}</span>
             </summary>
             <div className="acilir">
               <p className="acilir-baslik">{ad_}</p>
               {m.hata ? <p className="hata-satiri"><Simge ad="uyari" /> {m.hata}</p> : <p>Hazır. Ajanlar bu motorla çalışabilir.</p>}
               <dl className="acilir-liste">
-                {m.yerel && m.adres && <><dt>Ollama</dt><dd>{m.adres}{m.ollama_surum ? `, sürüm ${m.ollama_surum}` : ""}</dd></>}
+                {kurum && m.adres && <><dt>Adres</dt><dd><code>{m.adres}</code></dd></>}
+                {!kurum && m.yerel && m.adres && <><dt>Ollama</dt><dd>{m.adres}{m.ollama_surum ? `, sürüm ${m.ollama_surum}` : ""}</dd></>}
                 {m.yerel && m.model && <><dt>Model</dt><dd><code>{m.model}</code></dd></>}
-                {m.surum && <><dt>Claude Code</dt><dd>{m.surum}</dd></>}
+                {kurum ? <><dt>Ajan döngüsü</dt><dd>Kovan'ın kendisi (OpenAI uyumlu API)</dd></> : m.surum && <><dt>Claude Code</dt><dd>{m.surum}</dd></>}
                 {m.yol && <><dt>Komut</dt><dd><code>{m.yol}</code></dd></>}
               </dl>
             </div>

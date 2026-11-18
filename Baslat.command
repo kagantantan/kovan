@@ -56,4 +56,10 @@ fi
     if curl -s -o /dev/null "$URL/api/durum"; then ac "$URL"; break; fi
   done ) &
 
+# Dış ayar: KOVAN_AYAR verilmemişse ~/.kovan/kovan.yaml varsa onu kullan (kurum LLM'i, anahtarın yeri, ajanlar).
+# Çift tıklayınca ~/.zshrc okunmaz: anahtar için ortam değişkeni yerine anahtar_dosyasi kullan.
+if [ -z "${KOVAN_AYAR:-}" ] && [ -f "$HOME/.kovan/kovan.yaml" ]; then
+  export KOVAN_AYAR="$HOME/.kovan/kovan.yaml"
+fi
+
 KOVAN_PORT=$PORT ./node_modules/.bin/tsx sunucu/src/index.ts "$@"

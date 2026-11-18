@@ -1,0 +1,43 @@
+# Kovan'ı kurum içi bir LLM ile çalıştırmak için dış ayar dosyası örneği.
+#
+# Bu dosyayı repo DIŞINDA bir yere kopyala (ör. ~/.kovan/kovan.yaml) ve düzenle. API anahtarını
+# buraya yazma: Kovan buna izin vermez. Anahtarın nereden okunacağını söyle (ortam değişkeni ya da dosya).
+#
+# Başlatma:
+#   npm start -- --ayar ~/.kovan/kovan.yaml
+#   KOVAN_AYAR=~/.kovan/kovan.yaml npm start
+#   Mac'te Baslat.command: ~/.kovan/kovan.yaml varsa kendiliğinden okur
+#
+# Buradaki her üst anahtar repodaki kovan.yaml'ın aynı anahtarının yerine geçer. Yazmadıkların
+# repodaki gibi kalır.
+
+claude: false                 # Claude'a hiç bağlanma; claude komutu aranmaz, Hepsi Claude modu kapanır
+modlar: [yerel, deneme]       # arayüzde yalnızca bu modlar
+motor: yerel                  # yeni fikirde varsayılan mod
+yerel_motor: kurum-llm        # "Hepsi yerel" modunun motoru
+
+motorlar:                     # repodaki listenin yerine geçer: Ollama tanımı gelmez
+  kurum-llm:
+    tur: openai               # OpenAI uyumlu /chat/completions; ajanlar Kovan'ın kendi döngüsüyle çalışır
+    adres: https://llm.kurum.local/v1
+    model: qwen3-coder        # sunucudaki model adı (GET /v1/models'taki id)
+    anahtar_degiskeni: KURUM_LLM_ANAHTAR       # anahtarı tutan ortam değişkeninin ADI
+    # anahtar_dosyasi: ~/.kovan/kurum-anahtar  # ya da anahtarı içeren dosya (chmod 600); ikisinden biri
+    # anahtar_basligi: Authorization           # varsayılan "Authorization: Bearer <anahtar>"; ör. api-key ya da x-api-key
+    # ek_basliklar:                            # ağ geçidi başka başlık istiyorsa (gizli olmayanlar)
+    #   X-Uygulama: kovan
+    # ca_dosyasi: ~/.kovan/kurum-kok-ca.pem    # iç ağ HTTPS'i kurumun kök sertifikasıyla imzalıysa
+    # arac_bicimi: otomatik                    # otomatik | openai | metin (sunucu tool calling desteklemiyorsa metin)
+    baglam_token: 65536       # modelin bağlam penceresi; eski araç çıktıları buna göre kısaltılır
+    sicaklik: 0.2
+    # en_fazla_token: 8192    # bir yanıtta en fazla token (sunucu varsayılanı küçükse ver)
+    # en_fazla_tur: 100       # bir ajan çağrısında en fazla model turu
+
+ajanlar:                      # kart ayarlarını dışarıdan değiştir: motor, model, yerel_model, sure_dk, butce_usd, efor
+  "*":                        # araçlar, izinler ve sistem promptu kartta kalır (yetki dışarıdan genişletilmez)
+    motor: kurum-llm          # bütün ajanlar kurum LLM'inde
+  # mimar:
+  #   yerel_model: qwen3-235b # bu ajan sunucudaki başka bir modeli kullansın
+  #   sure_dk: 45
+  # mevcut-sistem-analisti:
+  #   sure_dk: 60             # büyük eski sistemlerde analiz uzun sürer

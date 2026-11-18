@@ -27,6 +27,10 @@ api_anahtarini_yoksay: true
 #   32 GB+ -> qwen3-coder:30b   (MoE, hızlı; varsayılan)
 #   16-24 GB -> qwen3.5:9b      (küçük; basit kalemlerde iş görür)
 #   16 GB altı -> yerel kodlama zayıf kalır; 'Hepsi Claude' modunu öneririm
+#
+# Kurum içi LLM (OpenAI uyumlu: vLLM, TGI, LM Studio, kurum ağ geçidi) için motoru burada değil, repo
+# dışındaki bir dış ayar dosyasında tanımla: npm start -- --ayar ~/.kovan/kovan.yaml (örnek:
+# ornekler/kurum-ayar.ornek.yaml). O motorda ajanlar Kovan'ın kendi döngüsüyle çalışır, Claude Code gerekmez.
 motorlar:
   qwen-yerel:
     tur: ollama

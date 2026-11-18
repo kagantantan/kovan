@@ -103,9 +103,13 @@ export interface TestKovani extends Kovan {
   kok: string;
 }
 
-export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor>; gecikme?: number } = {}): Promise<TestKovani> {
+/**
+ * motorlar: null verilirse motorlar ayarlardan kurulur (gerçek Claude, Ollama ya da OpenAI uyumlu motorlar).
+ * dis_ayar: geliştiricinin kabuğundaki KOVAN_AYAR testlere sızmasın diye varsayılan null.
+ */
+export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor> | null; gecikme?: number; dis_ayar?: string | null } = {}): Promise<TestKovani> {
   const kok = secenek.kok ?? geciciKok();
-  const motorlar = secenek.motorlar ?? new Map<string, Motor>([
+  const motorlar = secenek.motorlar === null ? undefined : secenek.motorlar ?? new Map<string, Motor>([
     ["deneme", new DenemeMotoru(secenek.gecikme ?? 0)],
     ["claude", new SahteMotor("claude")],
     ["qwen-yerel", new SahteMotor("qwen-yerel", true)],
@@ -114,6 +118,7 @@ export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarl
     ayar: { calisma_dizini: path.join(kok, "calisma"), port: 8765, ...secenek.ayar },
     motorlar,
     arayuz: path.join(kok, "arayuz-yok"),
+    dis_ayar: secenek.dis_ayar ?? null,
   });
   return { ...k, kok };
 }

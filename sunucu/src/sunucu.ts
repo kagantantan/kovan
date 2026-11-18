@@ -7,8 +7,9 @@ import path from "node:path";
 import { akisOzeti, akislariYukle, tumAdimlar } from "./akislar.js";
 import { HEDEF_YIGINLAR, ayarlariYukle, type Ayarlar } from "./ayarlar.js";
 import { Depo } from "./depo.js";
-import { kartOzeti, kartlariYukle } from "./kartlar.js";
+import { kartAyarlariniUygula, kartOzeti, kartlariYukle } from "./kartlar.js";
 import { ClaudeMotoru, DenemeMotoru, OllamaMotoru, type Motor } from "./motor.js";
+import { UyumluMotor } from "./uyumlu.js";
 import { Orkestrator, type Cevap } from "./orkestrator.js";
 import { KovanHatasi } from "./ortak.js";
 import type { AjanOzeti, DurumYaniti } from "./tipler.js";
@@ -52,20 +53,24 @@ export interface KurulumSecenekleri {
   arayuz?: string;
   /** Testler için: motorları değiştir (ör. sahte claude). */
   motorlar?: Map<string, Motor>;
+  /** Dış ayar dosyası; verilmezse KOVAN_AYAR, null ise hiç okunmaz. */
+  dis_ayar?: string | null;
 }
 
 export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): Promise<Kovan> {
-  const cfg = { ...ayarlariYukle(kok), ...secenek.ayar };
+  const cfg = { ...ayarlariYukle(kok, secenek.dis_ayar), ...secenek.ayar };
   const kartlar = kartlariYukle(path.join(kok, "ajanlar"));
+  kartAyarlariniUygula(kartlar, cfg.ajanlar);
   const akislar = akislariYukle(path.join(kok, "akislar"), kartlar);
   const calisma = cfg.calisma_dizini ? path.resolve(cfg.calisma_dizini.replace(/^~(?=$|\/)/, os.homedir())) : path.join(kok, "calisma");
   fs.mkdirSync(calisma, { recursive: true });
   const surum = String(JSON.parse(fs.readFileSync(path.join(kok, "package.json"), "utf8")).version ?? "?");
 
   const motorlar = secenek.motorlar ?? new Map<string, Motor>([
-    ["claude", new ClaudeMotoru(cfg.claude_yolu, cfg.api_anahtarini_yoksay)],
+    ...(cfg.claude ? [["claude", new ClaudeMotoru(cfg.claude_yolu, cfg.api_anahtarini_yoksay)] as [string, Motor]] : []),
     ["deneme", new DenemeMotoru(cfg.deneme_gecikme_sn)],
-    ...Object.entries(cfg.motorlar).map(([ad, m]) => [ad, new OllamaMotoru(ad, m.adres, m.model, cfg.claude_yolu)] as [string, Motor]),
+    ...Object.entries(cfg.motorlar).map(([ad, m]): [string, Motor] =>
+      [ad, m.tur === "openai" ? new UyumluMotor(ad, m) : new OllamaMotoru(ad, m.adres, m.model, cfg.claude_yolu)]),
   ]);
   const depo = new Depo(calisma);
   const ork = new Orkestrator(calisma, cfg, depo, kartlar, akislar, motorlar);
@@ -107,7 +112,9 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
       ajan_sorulari: cfg.ajan_sorulari, en_fazla_soru_turu: cfg.en_fazla_soru_turu, motorlar: durumlar,
       hedef_yiginlar: HEDEF_YIGINLAR,
       ornek_kaynak: fs.existsSync(path.join(kok, "ornekler", "reeskont-eski")) ? path.join(kok, "ornekler", "reeskont-eski") : null,
-      yerel_motor: [...motorlar.values()].find((m) => m.yerel && m.ad !== "deneme")?.ad ?? null,
+      yerel_motor: ork.yerelMotorAdi(),
+      modlar: ork.acikModlar(),
+      dis_ayar: cfg.dis_ayar,
       ortak_karar: {
         acik: cfg.ortak_karar.acik, kural: cfg.ortak_karar.kural,
         kurul: cfg.ortak_karar.kurul.map((id) => ({ id, ad: kartlar.get(id)?.ad ?? id, kisa: kartlar.get(id)?.kisaltma ?? id })),

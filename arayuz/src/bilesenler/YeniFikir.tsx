@@ -46,13 +46,15 @@ export function YeniFikir({ akislar, durum, onOlustu }: { akislar: AkisOzeti[]; 
 
   useEffect(() => { if (!profil && akislar[0]) setProfil(akislar[0].id); }, [akislar, profil]);
   useEffect(() => { if (durum) setMod((m) => (m === "hibrit" && durum.varsayilan_motor !== "hibrit" ? durum.varsayilan_motor : m)); }, [durum]);
+  // Bu kurulumda açık modlar (dış ayarla daraltılabilir; Claude kapalıysa Hepsi Claude yok)
+  const modlar = MODLAR.filter((m) => !durum || durum.modlar.includes(m));
+  const yerelMotor = durum?.yerel_motor ? durum.motorlar[durum.yerel_motor] : null;
 
   const motorUyarisi = (m: Mod): string | null => {
     if (!durum || m === "deneme") return null;
     if (m === "yerel") {
-      if (!durum.yerel_motor) return "kovan.yaml'da yerel motor tanımlı değil.";
-      const yerel = durum.motorlar[durum.yerel_motor];
-      return yerel && !yerel.hazir ? `Yerel motor hazır değil: ${yerel.hata ?? ""}` : null;
+      if (!durum.yerel_motor) return "Ayarlarda yerel motor tanımlı değil.";
+      return yerelMotor && !yerelMotor.hazir ? `Yerel motor (${durum.yerel_motor}) hazır değil: ${yerelMotor.hata ?? ""}` : null;
     }
     const claude = durum.motorlar.claude;
     if (claude && !claude.hazir) return `Claude hazır değil: ${claude.hata ?? ""}`;
@@ -178,10 +180,13 @@ export function YeniFikir({ akislar, durum, onOlustu }: { akislar: AkisOzeti[]; 
         <fieldset className="alan-grubu">
           <legend className="alan-ad">Mod</legend>
           <div className="secenekler secenekler--izgara">
-            {MODLAR.map((m) => {
+            {modlar.map((m) => {
               const uyari = motorUyarisi(m);
+              const aciklama = m === "yerel" && yerelMotor?.tur === "openai"
+                ? `Bütün ajanlar kurum LLM'inde (${durum?.yerel_motor}, ${yerelMotor.model}); hiçbir çağrı Claude'a gitmez.`
+                : MOD_ACIKLAMA[m];
               return (
-                <Secenek key={m} grup="mod" tip="radio" secili={mod === m} onDegis={() => setMod(m)} etiket={MOD_ADI[m]} aciklama={MOD_ACIKLAMA[m]}>
+                <Secenek key={m} grup="mod" tip="radio" secili={mod === m} onDegis={() => setMod(m)} etiket={MOD_ADI[m]} aciklama={aciklama}>
                   {uyari && <span className="secenek-uyari"><Simge ad="uyari" boyut={14} /> {uyari}</span>}
                 </Secenek>
               );

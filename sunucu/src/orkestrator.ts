@@ -214,7 +214,9 @@ export class Orkestrator {
   ) {
     for (const k of kartlar.values()) {
       if (!motorlar.has(k.motor) || k.motor === "deneme") {
-        throw new KovanHatasi(`ajanlar/${k.id}.md: motor '${k.motor}' tanımlı değil (claude ya da kovan.yaml'daki motorlar: ${[...motorlar.keys()].filter((m) => m !== "deneme").join(", ")})`);
+        const tanimli = [...motorlar.keys()].filter((m) => m !== "deneme").join(", ") || "yok";
+        throw new KovanHatasi(`ajanlar/${k.id}.md: motor '${k.motor}' tanımlı değil (tanımlı motorlar: ${tanimli}). ` +
+          `Bütün ajanları bir motora yönlendirmek için ayar dosyasında: ajanlar: { "*": { motor: <ad> } }`);
       }
     }
     for (const id of cfg.ortak_karar.kurul) {
@@ -224,9 +226,19 @@ export class Orkestrator {
   }
 
   // ================================ motor seçimi ================================
-  /** "Hepsi yerel" modunun motoru: kovan.yaml'daki ilk yerel motor. */
+  /** "Hepsi yerel" modunun motoru: ayarlardaki yerel_motor, yoksa ilk yerel motor. */
   private yerelMotor(): Motor | null {
+    if (this.cfg.yerel_motor) return this.motorlar.get(this.cfg.yerel_motor) ?? null;
     return [...this.motorlar.values()].find((m) => m.yerel && m.ad !== "deneme") ?? null;
+  }
+
+  yerelMotorAdi(): string | null {
+    return this.yerelMotor()?.ad ?? null;
+  }
+
+  /** Bu kurulumda açık modlar: Claude kapalıysa Hepsi Claude yok. */
+  acikModlar(): Mod[] {
+    return this.cfg.modlar.filter((m) => m !== "claude" || this.motorlar.has("claude"));
   }
 
   private motorSec(f: Fikir, kart: AjanKarti, asama?: Asama, uretici = false): Motor {
@@ -258,7 +270,7 @@ export class Orkestrator {
   }
 
   private devralinabilir(f: Fikir, asama: Asama): boolean {
-    if (f.motor !== "hibrit" || !asama.ajan) return false;
+    if (f.motor !== "hibrit" || !asama.ajan || !this.motorlar.has("claude")) return false;
     return this.motorSec(f, this.kartlar.get(asama.ajan)!, asama, true).yerel;
   }
 
@@ -289,6 +301,7 @@ export class Orkestrator {
     const akis = this.akislar.get(profil);
     if (!akis) throw new KovanHatasi(`Bilinmeyen akış: ${profil}`);
     if (!MODLAR.includes(mod as Mod)) throw new KovanHatasi(`Bilinmeyen mod: ${mod} (hibrit, claude, yerel ya da deneme)`);
+    if (!this.acikModlar().includes(mod as Mod)) throw new KovanHatasi(`'${mod}' modu bu kurulumda kapalı. Açık modlar: ${this.acikModlar().join(", ")}`);
     const kaynaklar = (ek.kaynaklar ?? []).map((y) => y.trim()).filter(Boolean);
     if (akis.kaynak === "zorunlu" && !kaynaklar.length && !onceki) {
       throw new KovanHatasi(`'${akis.ad}' akışı mevcut sistemin kaynaklarıyla başlar: kodun ve analiz dokümanının bulunduğu klasörü yaz.`);
@@ -300,9 +313,11 @@ export class Orkestrator {
     for (const ad of this.gerekenMotorlar(akis, mod as Mod)) {
       const m = this.motorlar.get(ad)!;
       if (!(await m.saglik(true))) {
-        const ipucu = !m.yerel ? "" : mod === "yerel"
-          ? " 'Hepsi yerel' modunda bütün ajanlar bu motorda çalışır; Ollama'yı başlat ya da Ollama-Kur.command ile kur."
-          : " Yerel motor olmadan çalıştırmak için 'Hepsi Claude' modunu seç.";
+        const ipucu = !m.yerel ? "" : m.tur === "openai"
+          ? " Adresi, modeli ve API anahtarını dış ayar dosyasında kontrol et."
+          : mod === "yerel"
+            ? " 'Hepsi yerel' modunda bütün ajanlar bu motorda çalışır; Ollama'yı başlat ya da Ollama-Kur.command ile kur."
+            : this.motorlar.has("claude") ? " Yerel motor olmadan çalıştırmak için 'Hepsi Claude' modunu seç." : "";
         throw new KovanHatasi(`'${ad}' motoru hazır değil: ${m.hata}${ipucu}`);
       }
     }

@@ -287,7 +287,9 @@ export interface DurumYaniti {
   ortak_karar: { acik: boolean; kurul: { id: string; ad: string; kisa: string }[]; kural: "oybirligi" | "cogunluk" };
   hedef_yiginlar: HedefYigin[];
   ornek_kaynak: string | null;  // Kovan'la gelen kurgusal eski sistem (ornekler/reeskont-eski), replatform örneği için
-  yerel_motor: string | null;   // "Hepsi yerel" modunda bütün ajanların kullandığı motor
+  yerel_motor: string | null;
+  modlar: Mod[];                // bu kurulumda açık modlar
+  dis_ayar: string | null;      // okunan dış ayar dosyası   // "Hepsi yerel" modunda bütün ajanların kullandığı motor
   motorlar: Record<string, MotorDurumu>;
 }
 

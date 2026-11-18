@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 
+import type { KartAyari } from "./ayarlar.js";
+
 export const BILINEN_ARACLAR = new Set([
   "Read", "Write", "Edit", "MultiEdit", "Glob", "Grep", "Bash",
   "WebFetch", "WebSearch", "NotebookEdit", "TodoWrite", "Task",
@@ -81,6 +83,30 @@ export function kartlariYukle(dizin: string): Map<string, AjanKarti> {
   }
   if (!kartlar.size) throw new Error(`${dizin} içinde ajan kartı bulunamadı`);
   return kartlar;
+}
+
+/**
+ * Dış ayardaki ajanlar bölümünü kartlara uygular: önce "*" (hepsi), sonra kartın kendi kimliği.
+ * Yalnızca motor, model, süre ve bütçe değişir; araçlar ve izinler kartta kalır.
+ */
+export function kartAyarlariniUygula(kartlar: Map<string, AjanKarti>, ayarlar: Record<string, KartAyari>): void {
+  const bilinmeyen = Object.keys(ayarlar).filter((id) => id !== "*" && !kartlar.has(id));
+  if (bilinmeyen.length) throw new Error(`ayarlar: ajanlar içinde bilinmeyen ajan: ${bilinmeyen.join(", ")} (kartlar: ${[...kartlar.keys()].join(", ")})`);
+  for (const k of kartlar.values()) {
+    for (const a of [ayarlar["*"], ayarlar[k.id]]) {
+      if (!a) continue;
+      if (a.motor !== undefined) k.motor = String(a.motor);
+      if (a.model !== undefined) k.model = String(a.model);
+      if (a.yerel_model !== undefined) k.yerel_model = a.yerel_model === null ? null : String(a.yerel_model);
+      if (a.efor !== undefined) k.efor = a.efor === null ? null : String(a.efor);
+      if (a.sure_dk !== undefined) {
+        const v = Number(a.sure_dk);
+        if (!(v > 0)) throw new Error(`ayarlar: ajanlar.${k.id}.sure_dk pozitif bir sayı olmalı`);
+        k.sure_dk = v;
+      }
+      if (a.butce_usd !== undefined) k.butce_usd = a.butce_usd === null ? null : Number(a.butce_usd);
+    }
+  }
 }
 
 export function kartOzeti(k: AjanKarti) {

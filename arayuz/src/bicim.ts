@@ -47,7 +47,7 @@ export const MOD_ADI: Record<Mod, string> = { hibrit: "Hibrit", claude: "Hepsi C
 export const MOD_ACIKLAMA: Record<Mod, string> = {
   hibrit: "Kodu yerel model yazar; analiz, tasarım ve onaylar Claude'da.",
   claude: "Bütün ajanlar Claude'da. Yerel motor hazır değilse ya da kıyas için.",
-  yerel: "Bütün ajanlar yerel modelde; kod ve belgeler bu makineden çıkmaz. Kurum içi kod için. Daha yavaş, daha fazla düzeltme turu.",
+  yerel: "Bütün ajanlar yerel motorda; hiçbir çağrı Claude'a gitmez. Kurum içi kod için. Daha yavaş, daha fazla düzeltme turu.",
   deneme: "Gerçek ajan çalışmaz, token harcanmaz. Akışı ve soruları görmek için.",
 };
 

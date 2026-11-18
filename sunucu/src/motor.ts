@@ -59,7 +59,7 @@ export type { MotorDurumu };
 
 export interface Motor {
   readonly ad: string;
-  readonly tur: "claude" | "ollama" | "deneme";
+  readonly tur: "claude" | "ollama" | "openai" | "deneme";
   readonly yerel: boolean;
   hazir: boolean;
   hata: string | null;
@@ -131,7 +131,7 @@ export const OY_SEMASI = {
 };
 
 /** Model --json-schema'yı desteklemiyorsa (yerel motor) JSON istemin sonunda istenir. */
-function yedekJsonTalimati(c: AjanCagrisi): string {
+export function yedekJsonTalimati(c: AjanCagrisi): string {
   const ornek = c.gorev_turu === "karar"
     ? '{"oylar": [{"soru": 1, "secim": [1], "insana_birak": false, "gerekce": "..."}]}'
     : '{"karar": "ONAY" | "DUZELT" | "SORU", "gerekce": "...", "bulgular": ["..."], "sorular": []}';
