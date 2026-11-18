@@ -49,7 +49,8 @@ export type Rota =
   | { sayfa: "fikirler"; id: string | null }
   | { sayfa: "yeni" }
   | { sayfa: "ajanlar"; id: string | null }
-  | { sayfa: "akislar" };
+  | { sayfa: "akislar" }
+  | { sayfa: "ayarlar" };
 
 export function rotaCoz(hash: string): Rota {
   const parcalar = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
@@ -57,6 +58,7 @@ export function rotaCoz(hash: string): Rota {
     case "yeni": return { sayfa: "yeni" };
     case "ajanlar": return { sayfa: "ajanlar", id: parcalar[1] ?? null };
     case "akislar": return { sayfa: "akislar" };
+    case "ayarlar": return { sayfa: "ayarlar" };
     case "fikirler": return { sayfa: "fikirler", id: parcalar[1] ?? null };
     default: return { sayfa: "fikirler", id: /^F-\d+$/.test(parcalar[0] ?? "") ? parcalar[0] : null };
   }

@@ -22,6 +22,7 @@ Bir değişikliği bitmiş saymadan önce: `npm run typecheck && npm test && npm
 | `sunucu/src/motor.ts` | `Motor` arayüzü. `ClaudeMotoru` (`claude -p`, abonelik), `OllamaMotoru` (aynı CLI, yerel model), `DenemeMotoru` |
 | `sunucu/src/uyumlu.ts` | OpenAI uyumlu motor (kurum içi LLM). Her ajan çağrısını `sunucu/src/ajan/kovan-ajan.ts` alt sürecinde çalıştırır |
 | `sunucu/src/ajan/` | Kovan'ın kendi ajan döngüsü (`dongu.ts`) ve araçları (`araclar.ts`: Read, Write, Edit, MultiEdit, Glob, Grep, Bash) |
+| `sunucu/src/kasa.ts` | API anahtarı için işletim sisteminin kasası (Ayarlar ekranındaki "kalıcı" kayıt) |
 | `sunucu/src/ayarlar.ts` | `kovan.yaml` ve dış ayar dosyası (`--ayar`, `KOVAN_AYAR`) katmanları, doğrulama |
 | `sunucu/src/kartlar.ts`, `akislar.ts` | Ajan kartları (`ajanlar/*.md`) ve akışlar (`akislar/*.yaml`) |
 | `sunucu/src/kaynak.ts` | Replatform: kaynak içe alma, envanter, kod atıfları denetimi |
@@ -35,7 +36,7 @@ Bir değişikliği bitmiş saymadan önce: `npm run typecheck && npm test && npm
 
 - **Dil:** tanımlayıcılar, yorumlar, arayüz metinleri, hata mesajları ve test adları Türkçe; mevcut stile uy. Standartlaşmış teknik terimler İngilizce kalır (tool calling, endpoint, streaming).
 - **Repo herkese açık:** kişi, kurum ya da şirket adı, e-posta ya da iç adres yazma. Örneklerde `kurum`, `llm.kurum.local` gibi nötr adlar kullan.
-- **Sırlar:** API anahtarı ayar dosyasına, repoya, günlüğe, isteme ya da `/api/durum`'a girmez. Ayarda yalnızca yeri durur (`anahtar_degiskeni` ya da `anahtar_dosyasi`); `ayarlar.ts` anahtarın kendisini reddeder. Anahtar alt sürece `KOVAN_LLM_ANAHTAR` ile geçer ve Bash'in ortamından silinir. Bunu koruyan testler var; gevşetme.
+- **Sırlar:** API anahtarı ayar dosyasına, repoya, günlüğe, isteme ya da `/api/durum`'a girmez. Ayarda yalnızca yeri durur (`anahtar_degiskeni` ya da `anahtar_dosyasi`); `ayarlar.ts` anahtarın kendisini reddeder. Anahtar alt sürece `KOVAN_LLM_ANAHTAR` ile geçer ve Bash'in ortamından silinir. Ayarlar ekranından girilen anahtar bellekte ya da işletim sisteminin kasasında (`sunucu/src/kasa.ts`: Anahtar Zinciri, Secret Service) durur; kasaya stdin'den yazılır. Testler kasaya dokunmaz (`kovanOlustur()` varsayılan `kasa: null`). Bunu koruyan testler var; gevşetme.
 - **Ajan yetkisi kartta:** dış ayar yalnızca `motor`, `model`, `yerel_model`, `sure_dk`, `butce_usd`, `efor` değiştirir. Araçlar, izinler ve sistem promptu dışarıdan genişletilmez.
 - **Sınırlar:** yazma alanı ve kilitli dosyalar orkestratörde denetlenir. Araçlarda yol hapsi (`..`, mutlak yol, sembolik bağ) ve Bash izin kalıpları (`Bash(npm test:*)`, `$( )` yasak) var. Bunları gevşeten bir değişiklikten önce sor.
 - **Testler ağa çıkmaz:** sahte `claude` (`sunucu/test/yardimci/sahte-claude.mjs`), sahte Ollama ve sahte OpenAI uyumlu sunucu kullan. Davranış değişikliği test ister.

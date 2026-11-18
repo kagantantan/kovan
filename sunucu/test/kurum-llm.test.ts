@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { bashIzni, komutParcala, yolCoz } from "../src/ajan/araclar.js";
 import { ajanDongusu, baglamKirp, metindenCagrilar, sonMetin, type BaglantiAyari, type DonguIstegi } from "../src/ajan/dongu.js";
 import { ayarlariYukle } from "../src/ayarlar.js";
+import { BellekKasasi } from "../src/kasa.js";
 import { bekle, bekliyor, geciciKok, KOK, kovanOlustur, ORNEK_MINI } from "./yardimci/ortam.js";
 
 // ------------------------------------------------------------------------------------------
@@ -315,8 +316,8 @@ describe("Dış ayar dosyası", () => {
     // anahtar yoksa motor hazır değil ve sebebi söylenir; anahtar dosyadan da okunabilir
     const k = await kovanOlustur({ motorlar: null, dis_ayar: disAyar(s.adres) });
     const durum = await k.motorlar.get("kurum-llm")!.durumOzeti();
-    expect(durum).toMatchObject({ hazir: false, hata: "API anahtarı yok: KOVAN_TEST_KURUM_ANAHTAR ortam değişkeni boş. Kovan'ı başlatmadan önce ayarla." });
-    await expect(k.ork.yeniFikir("", ORNEK_MINI, "mini", "yerel")).rejects.toThrow(/'kurum-llm' motoru hazır değil: API anahtarı yok.*Adresi, modeli ve API anahtarını dış ayar dosyasında kontrol et/);
+    expect(durum).toMatchObject({ hazir: false, hata: "API anahtarı yok: KOVAN_TEST_KURUM_ANAHTAR ortam değişkeni boş. Ayarlar ekranından gir ya da Kovan'ı başlatmadan önce ayarla." });
+    await expect(k.ork.yeniFikir("", ORNEK_MINI, "mini", "yerel")).rejects.toThrow(/'kurum-llm' motoru hazır değil: API anahtarı yok.*API anahtarını Ayarlar ekranında kontrol et/);
     const anahtarDosyasi = path.join(gecici(), "anahtar");
     fs.writeFileSync(anahtarDosyasi, "dosyadaki-anahtar\n");
     const dosyali = disAyar(s.adres);
@@ -379,4 +380,98 @@ describe("Dış ayar dosyası", () => {
       delete process.env.KOVAN_TEST_KURUM_ANAHTAR;
     }
   }, 60_000);
+});
+
+// ------------------------------------------------------------------------------------------
+// Ayarlar ekranı: API anahtarı ekrandan girilir, bellekte ya da işletim sisteminin kasasında durur
+// ------------------------------------------------------------------------------------------
+/** Yalnızca doğru anahtarla /v1/models'e cevap veren sunucu: bağlantı denemesi anahtarı gerçekten kullanıyor mu? */
+async function anahtarliSunucu(dogru: string): Promise<{ adres: string; gelen: string[]; kapat: () => Promise<void> }> {
+  const gelen: string[] = [];
+  const sunucu = http.createServer((req, res) => {
+    gelen.push(String(req.headers.authorization ?? ""));
+    const ok = req.headers.authorization === `Bearer ${dogru}`;
+    res.writeHead(ok ? 200 : 401, { "content-type": "application/json" });
+    res.end(JSON.stringify(ok ? { data: [{ id: "qwen-test" }] } : { error: "yetkisiz" }));
+  });
+  await new Promise<void>((coz) => sunucu.listen(0, "127.0.0.1", coz));
+  const s = {
+    adres: `http://127.0.0.1:${(sunucu.address() as { port: number }).port}/v1`, gelen,
+    kapat: () => new Promise<void>((coz) => { sunucu.closeAllConnections(); sunucu.close(() => coz()); }),
+  };
+  sunucular.push(s as unknown as SahteSunucu);
+  return s;
+}
+
+describe("Ayarlar ekranı: API anahtarı", () => {
+  const H = { host: "127.0.0.1:8765", origin: "http://127.0.0.1:8765" };
+  const gonder = (k: { app: { inject: Function } }, yol: string, govde: unknown = {}, basliklar: Record<string, string> = H) =>
+    k.app.inject({ method: "POST", url: yol, headers: basliklar, payload: govde as object });
+
+  it("ekrandan girilen anahtar bağlantıyı dener, yanlışsa söyler; anahtar hiçbir yanıtta yok", async () => {
+    const s = await anahtarliSunucu("dogru-anahtar");
+    const kasa = new BellekKasasi();
+    const k = await kovanOlustur({ motorlar: null, dis_ayar: disAyar(s.adres), kasa });
+
+    const ilk = (await k.app.inject({ url: "/api/durum", headers: H })).json().motorlar["kurum-llm"];
+    expect(ilk).toMatchObject({ hazir: false, anahtar_kaynagi: null, kasa: "test kasası", anahtar_basligi: "Authorization" });
+    expect(ilk.hata).toMatch(/Ayarlar ekranından gir/);
+
+    const yanlis = await gonder(k, "/api/motorlar/kurum-llm/anahtar", { anahtar: "yanlis-anahtar", kalici: false });
+    expect(yanlis.statusCode).toBe(200);
+    expect(yanlis.json()).toMatchObject({ hazir: false, anahtar_kaynagi: "ekran", hata: expect.stringMatching(/API anahtarı reddedildi \(HTTP 401\)/) });
+    expect(yanlis.body).not.toContain("yanlis-anahtar");
+
+    const dogru = await gonder(k, "/api/motorlar/kurum-llm/anahtar", { anahtar: "  dogru-anahtar  ", kalici: false });
+    expect(dogru.json()).toMatchObject({ hazir: true, hata: null, anahtar_kaynagi: "ekran", modeller: ["qwen-test"] });
+    expect(s.gelen.at(-1)).toBe("Bearer dogru-anahtar");
+    expect(kasa.kayitlar.size).toBe(0);                                         // kalıcı istenmedi: kasaya yazılmadı
+    expect((await gonder(k, "/api/motorlar/kurum-llm/dene")).json()).toMatchObject({ hazir: true });
+    const durum = await k.app.inject({ url: "/api/durum", headers: H });
+    expect(durum.json().motorlar["kurum-llm"]).toMatchObject({ hazir: true, anahtar_kaynagi: "ekran" });
+    for (const b of [dogru.body, durum.body]) expect(b).not.toContain("dogru-anahtar");
+    await k.ork.kapat();
+  });
+
+  it("kalıcı anahtar kasaya yazılır, Kovan yeniden açılınca kasadan gelir; silinince motor hazır değil", async () => {
+    const s = await anahtarliSunucu("kalici-anahtar");
+    const kasa = new BellekKasasi();
+    const yol = disAyar(s.adres);
+    const k = await kovanOlustur({ motorlar: null, dis_ayar: yol, kasa });
+    expect((await gonder(k, "/api/motorlar/kurum-llm/anahtar", { anahtar: "kalici-anahtar", kalici: true })).json()).toMatchObject({ hazir: true, anahtar_kaynagi: "kasa" });
+    expect(kasa.kayitlar.get("kurum-llm")).toBe("kalici-anahtar");
+    await k.ork.kapat();
+
+    const k2 = await kovanOlustur({ motorlar: null, dis_ayar: yol, kasa });
+    expect(await k2.motorlar.get("kurum-llm")!.durumOzeti()).toMatchObject({ hazir: true, anahtar_kaynagi: "kasa" });
+    expect((await gonder(k2, "/api/motorlar/kurum-llm/anahtar-sil")).json()).toMatchObject({ hazir: false, anahtar_kaynagi: null });
+    expect(kasa.kayitlar.size).toBe(0);
+    await k2.ork.kapat();
+  });
+
+  it("ortam değişkeni kasadan önce gelir; kasa yoksa kalıcı kayıt reddedilir; geçersiz anahtar, yanlış motor ve başka köken reddedilir", async () => {
+    const s = await anahtarliSunucu("degiskendeki");
+    const kasa = new BellekKasasi();
+    kasa.yaz("kurum-llm", "kasadaki");
+    process.env.KOVAN_TEST_KURUM_ANAHTAR = "degiskendeki";
+    try {
+      const k = await kovanOlustur({ motorlar: null, dis_ayar: disAyar(s.adres), kasa });
+      expect(await k.motorlar.get("kurum-llm")!.durumOzeti()).toMatchObject({ hazir: true, anahtar_kaynagi: "degisken" });
+      await k.ork.kapat();
+    } finally {
+      delete process.env.KOVAN_TEST_KURUM_ANAHTAR;
+    }
+
+    const k = await kovanOlustur({ motorlar: null, dis_ayar: disAyar(s.adres), kasa: null });
+    const kasasiz = await gonder(k, "/api/motorlar/kurum-llm/anahtar", { anahtar: "degiskendeki", kalici: true });
+    expect([kasasiz.statusCode, kasasiz.json().detail]).toEqual([400, "Bu makinede işletim sistemi kasası yok; anahtar yalnızca bellekte tutulabilir."]);
+    const bosluklu = await gonder(k, "/api/motorlar/kurum-llm/anahtar", { anahtar: "iki parca", kalici: false });
+    expect(bosluklu.statusCode).toBe(400);
+    expect(bosluklu.body).not.toContain("iki parca");
+    expect((await gonder(k, "/api/motorlar/deneme/anahtar", { anahtar: "x" })).statusCode).toBe(404);
+    const baskaKoken = await gonder(k, "/api/motorlar/kurum-llm/anahtar", { anahtar: "degiskendeki" }, { host: "127.0.0.1:8765", origin: "http://kotu.example" });
+    expect(baskaKoken.statusCode).toBe(403);
+    expect(await k.motorlar.get("kurum-llm")!.durumOzeti()).toMatchObject({ hazir: false, anahtar_kaynagi: null });
+    await k.ork.kapat();
+  });
 });

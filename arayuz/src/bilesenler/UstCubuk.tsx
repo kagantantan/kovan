@@ -39,6 +39,7 @@ function MotorDurumu({ durum }: { durum: DurumYaniti | null }) {
                 {kurum ? <><dt>Ajan döngüsü</dt><dd>Kovan'ın kendisi (OpenAI uyumlu API)</dd></> : m.surum && <><dt>Claude Code</dt><dd>{m.surum}</dd></>}
                 {m.yol && <><dt>Komut</dt><dd><code>{m.yol}</code></dd></>}
               </dl>
+              {kurum && <p><a href="#/ayarlar">{m.anahtar_kaynagi ? "API anahtarını değiştir ya da bağlantıyı dene" : "API anahtarını gir"}</a></p>}
             </div>
           </details>
         );
@@ -76,6 +77,7 @@ export function UstCubuk({ rota, durum, bekleyen }: { rota: Rota; durum: DurumYa
         </a>
         <a href="#/ajanlar" aria-current={sayfa === "ajanlar" ? "page" : undefined}>Ajanlar</a>
         <a href="#/akislar" aria-current={sayfa === "akislar" ? "page" : undefined}>Akışlar</a>
+        <a href="#/ayarlar" aria-current={sayfa === "ayarlar" ? "page" : undefined}>Ayarlar</a>
       </nav>
       <div className="ust-sag">
         <MotorDurumu durum={durum} />

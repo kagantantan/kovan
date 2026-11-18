@@ -10,7 +10,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { HttpHatasi, baglantiHatasi, jsonIstek, type AracBicimi, type BaglantiAyari, type DonguSonucu } from "./ajan/dongu.js";
 import type { AjanKarti } from "./kartlar.js";
 import { sonuc, sureciOldur, yedekJsonTalimati, type AjanCagrisi, type AjanSonucu, type Motor } from "./motor.js";
-import type { MotorDurumu } from "./tipler.js";
+import type { Kasa } from "./kasa.js";
+import { KovanHatasi } from "./ortak.js";
+import type { AnahtarKaynagi, MotorDurumu } from "./tipler.js";
 
 export interface UyumluMotorAyari {
   tur: "openai";
@@ -42,24 +44,71 @@ export class UyumluMotor implements Motor {
   modeller: string[] = [];
   private sonKontrol = 0;
 
-  constructor(readonly ad: string, readonly ayar: UyumluMotorAyari) {
+  /** Ayarlar ekranından girilen anahtar; kalıcı istendiyse kasaya da yazılmıştır. */
+  private ekrandaki: string | null = null;
+  private ekrandakiKasada = false;
+  /** Kasadan okunan anahtar; undefined: henüz okunmadı. */
+  private kasadaki: string | null | undefined = undefined;
+
+  constructor(readonly ad: string, readonly ayar: UyumluMotorAyari, readonly kasa: Kasa | null = null) {
     this.yerel = ayar.yerel !== false;
   }
 
-  /** Anahtar her çağrıda yeniden okunur: dosyadaki anahtar değişirse Kovan'ı yeniden başlatmak gerekmez. */
-  anahtar(): { deger: string | null; hata: string | null } {
+  /**
+   * Sıra: ekrandan girilen > anahtar_dosyasi > anahtar_degiskeni > işletim sisteminin kasası.
+   * Dosya ve değişken her çağrıda yeniden okunur: değişirse Kovan'ı yeniden başlatmak gerekmez.
+   */
+  anahtar(): { deger: string | null; hata: string | null; kaynak: AnahtarKaynagi | null } {
+    if (this.ekrandaki) return { deger: this.ekrandaki, hata: null, kaynak: this.ekrandakiKasada ? "kasa" : "ekran" };
     const { anahtar_dosyasi: dosya, anahtar_degiskeni: degisken } = this.ayar;
+    let hata: string | null = null;
     if (dosya) {
       const p = evYolu(dosya);
-      if (!fs.existsSync(p)) return { deger: null, hata: `API anahtarı dosyası yok: ${p}` };
-      const d = fs.readFileSync(p, "utf8").trim();
-      return d ? { deger: d, hata: null } : { deger: null, hata: `API anahtarı dosyası boş: ${p}` };
-    }
-    if (degisken) {
+      const d = fs.existsSync(p) ? fs.readFileSync(p, "utf8").trim() : "";
+      if (d) return { deger: d, hata: null, kaynak: "dosya" };
+      hata = fs.existsSync(p) ? `API anahtarı dosyası boş: ${p}` : `API anahtarı dosyası yok: ${p}`;
+    } else if (degisken) {
       const d = process.env[degisken]?.trim();
-      return d ? { deger: d, hata: null } : { deger: null, hata: `API anahtarı yok: ${degisken} ortam değişkeni boş. Kovan'ı başlatmadan önce ayarla.` };
+      if (d) return { deger: d, hata: null, kaynak: "degisken" };
+      hata = `API anahtarı yok: ${degisken} ortam değişkeni boş`;
     }
-    return { deger: null, hata: null };
+    const k = this.kasadanOku();
+    if (k) return { deger: k, hata: null, kaynak: "kasa" };
+    return { deger: null, hata: hata && `${hata}. Ayarlar ekranından gir ya da Kovan'ı başlatmadan önce ayarla.`, kaynak: null };
+  }
+
+  private kasadanOku(): string | null {
+    if (!this.kasa) return null;
+    if (this.kasadaki === undefined) {
+      try { this.kasadaki = this.kasa.oku(this.ad); } catch { this.kasadaki = null; }
+    }
+    return this.kasadaki;
+  }
+
+  /** Ayarlar ekranından: anahtarı belleğe al; kalıcıysa kasaya da yaz. Anahtar hiçbir hata mesajına girmez. */
+  anahtarAyarla(deger: string, kalici: boolean): void {
+    const d = deger.trim();
+    if (!d) throw new KovanHatasi("API anahtarı boş.");
+    if (d.length > 4096 || /[\s\u0000-\u001f\u007f]/.test(d)) throw new KovanHatasi("API anahtarı boşluk ya da kontrol karakteri içeremez, en fazla 4096 karakter olabilir.");
+    if (kalici) {
+      if (!this.kasa) throw new KovanHatasi("Bu makinede işletim sistemi kasası yok; anahtar yalnızca bellekte tutulabilir.");
+      try { this.kasa.yaz(this.ad, d); } catch (e) { throw new KovanHatasi((e as Error).message, 500); }
+      this.kasadaki = d;
+    }
+    this.ekrandaki = d;
+    this.ekrandakiKasada = kalici;
+    this.sonKontrol = 0;
+  }
+
+  /** Ekrandan girileni ve kasadakini siler; dosya ve ortam değişkenine dokunmaz. */
+  anahtarSil(): void {
+    this.ekrandaki = null;
+    this.ekrandakiKasada = false;
+    if (this.kasa) {
+      try { this.kasa.sil(this.ad); } catch (e) { throw new KovanHatasi(`Kasadan silinemedi: ${(e as Error).message}`, 500); }
+      this.kasadaki = null;
+    }
+    this.sonKontrol = 0;
   }
 
   private baglanti(anahtar: string | null, model = this.ayar.model): BaglantiAyari {
@@ -102,7 +151,11 @@ export class UyumluMotor implements Motor {
   }
 
   async durumOzeti(): Promise<MotorDurumu> {
-    return { hazir: await this.saglik(), surum: this.surum, hata: this.hata, yol: null, tur: this.tur, yerel: this.yerel, model: this.ayar.model, adres: this.ayar.adres };
+    const hazir = await this.saglik();
+    return {
+      hazir, surum: this.surum, hata: this.hata, yol: null, tur: this.tur, yerel: this.yerel, model: this.ayar.model, adres: this.ayar.adres,
+      anahtar_kaynagi: this.anahtar().kaynak, anahtar_basligi: this.ayar.anahtar_basligi || "Authorization", kasa: this.kasa?.ad ?? null,
+    };
   }
 
   async calistir(c: AjanCagrisi): Promise<AjanSonucu> {

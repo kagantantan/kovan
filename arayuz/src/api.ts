@@ -1,6 +1,6 @@
 // Kovan sunucusunun JSON API'si. Tipler sunucuyla ortak (sunucu/src/tipler.ts).
 import type {
-  AjanOzeti, AkisOzeti, Cevap, DosyaIcerigi, DurumYaniti, FikirDetayi, FikirOzeti, Mod,
+  AjanOzeti, AkisOzeti, BaglantiSonucu, Cevap, DosyaIcerigi, DurumYaniti, FikirDetayi, FikirOzeti, Mod,
 } from "../../sunucu/src/tipler";
 
 export type * from "../../sunucu/src/tipler";
@@ -46,6 +46,10 @@ export const api = {
   durdur: (id: string) => istek<{ ok: true }>(`${yolu(id)}/durdur`, {}),
   devam: (id: string) => istek<{ ok: true }>(`${yolu(id)}/devam`, {}),
   yeniSurum: (id: string, metin: string) => istek<{ id: string }>(`${yolu(id)}/surum`, { metin }),
+  anahtarAyarla: (motor: string, anahtar: string, kalici: boolean) =>
+    istek<BaglantiSonucu>(`/api/motorlar/${encodeURIComponent(motor)}/anahtar`, { anahtar, kalici }),
+  anahtarSil: (motor: string) => istek<BaglantiSonucu>(`/api/motorlar/${encodeURIComponent(motor)}/anahtar-sil`, {}),
+  baglantiDene: (motor: string) => istek<BaglantiSonucu>(`/api/motorlar/${encodeURIComponent(motor)}/dene`, {}),
 };
 
 export const onizlemeAdresi = (id: string, yol: string) =>

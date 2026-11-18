@@ -314,7 +314,7 @@ export class Orkestrator {
       const m = this.motorlar.get(ad)!;
       if (!(await m.saglik(true))) {
         const ipucu = !m.yerel ? "" : m.tur === "openai"
-          ? " Adresi, modeli ve API anahtarını dış ayar dosyasında kontrol et."
+          ? " Adresi ve modeli dış ayar dosyasında, API anahtarını Ayarlar ekranında kontrol et."
           : mod === "yerel"
             ? " 'Hepsi yerel' modunda bütün ajanlar bu motorda çalışır; Ollama'yı başlat ya da Ollama-Kur.command ile kur."
             : this.motorlar.has("claude") ? " Yerel motor olmadan çalıştırmak için 'Hepsi Claude' modunu seç." : "";

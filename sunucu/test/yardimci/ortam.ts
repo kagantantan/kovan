@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Ayarlar } from "../../src/ayarlar.js";
 import type { AjanKarti } from "../../src/kartlar.js";
+import type { Kasa } from "../../src/kasa.js";
 import { DenemeMotoru, sonuc, type AjanCagrisi, type AjanSonucu, type Motor, type MotorDurumu } from "../../src/motor.js";
 import { kovanKur, type Kovan } from "../../src/sunucu.js";
 import type { Fikir } from "../../src/tipler.js";
@@ -106,8 +107,9 @@ export interface TestKovani extends Kovan {
 /**
  * motorlar: null verilirse motorlar ayarlardan kurulur (gerçek Claude, Ollama ya da OpenAI uyumlu motorlar).
  * dis_ayar: geliştiricinin kabuğundaki KOVAN_AYAR testlere sızmasın diye varsayılan null.
+ * kasa: varsayılan null; işletim sisteminin anahtar kasası hiç okunmaz.
  */
-export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor> | null; gecikme?: number; dis_ayar?: string | null } = {}): Promise<TestKovani> {
+export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor> | null; gecikme?: number; dis_ayar?: string | null; kasa?: Kasa | null } = {}): Promise<TestKovani> {
   const kok = secenek.kok ?? geciciKok();
   const motorlar = secenek.motorlar === null ? undefined : secenek.motorlar ?? new Map<string, Motor>([
     ["deneme", new DenemeMotoru(secenek.gecikme ?? 0)],
@@ -119,6 +121,7 @@ export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarl
     motorlar,
     arayuz: path.join(kok, "arayuz-yok"),
     dis_ayar: secenek.dis_ayar ?? null,
+    kasa: secenek.kasa ?? null,          // testler geliştiricinin Anahtar Zinciri'ne dokunmasın
   });
   return { ...k, kok };
 }

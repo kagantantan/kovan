@@ -268,7 +268,20 @@ export interface MotorDurumu {
   model: string | null;
   adres?: string;
   ollama_surum?: string | null;
+  /** OpenAI uyumlu motor: anahtar nereden geliyor. Anahtarın kendisi hiçbir yanıtta yok. */
+  anahtar_kaynagi?: AnahtarKaynagi | null;
+  anahtar_basligi?: string;
+  /** İşletim sisteminin kasası (ör. "macOS Anahtar Zinciri"); yoksa null. */
+  kasa?: string | null;
 }
+
+/** Ayarlar ekranındaki kaydet, dene ve sil işlemlerinin yanıtı. */
+export interface BaglantiSonucu extends MotorDurumu {
+  modeller: string[];
+}
+
+/** ekran: Ayarlar ekranından girildi (bellekte); kasa: işletim sisteminin kasası; dosya: anahtar_dosyasi; degisken: anahtar_degiskeni. */
+export type AnahtarKaynagi = "ekran" | "kasa" | "dosya" | "degisken";
 
 export interface HedefYigin {
   id: string;

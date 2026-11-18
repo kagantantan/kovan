@@ -1,8 +1,9 @@
-// Kovan arayüzü: üst çubuk + sayfalar (fikirler, yeni fikir, ajanlar, akışlar).
+// Kovan arayüzü: üst çubuk + sayfalar (fikirler, yeni fikir, ajanlar, akışlar, ayarlar).
 import { useEffect, useMemo, useRef } from "react";
 import { api, type FikirOzeti } from "./api";
 import { Ajanlar } from "./bilesenler/Ajanlar";
 import { Akislar } from "./bilesenler/Akislar";
+import { Ayarlar } from "./bilesenler/Ayarlar";
 import { FikirListesi } from "./bilesenler/FikirListesi";
 import { FikirSayfasi } from "./bilesenler/FikirSayfasi";
 import { Simge } from "./bilesenler/Simge";
@@ -78,6 +79,8 @@ export function App() {
         </div>
       ) : rota.sayfa === "ajanlar" ? (
         <main className="icerik icerik--genis">{ajanlar.veri ? <Ajanlar ajanlar={ajanlar.veri} seciliId={rota.id} durum={durum.veri} /> : <p className="bos-not">Yükleniyor...</p>}</main>
+      ) : rota.sayfa === "ayarlar" ? (
+        <main className="icerik icerik--genis"><Ayarlar durum={durum.veri} onDegisti={() => void durum.yenile()} /></main>
       ) : (
         <main className="icerik icerik--genis">{akislar.veri ? <Akislar akislar={akislar.veri} /> : <p className="bos-not">Yükleniyor...</p>}</main>
       )}

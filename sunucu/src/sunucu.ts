@@ -9,6 +9,7 @@ import { HEDEF_YIGINLAR, ayarlariYukle, type Ayarlar } from "./ayarlar.js";
 import { Depo } from "./depo.js";
 import { kartAyarlariniUygula, kartOzeti, kartlariYukle } from "./kartlar.js";
 import { ClaudeMotoru, DenemeMotoru, OllamaMotoru, type Motor } from "./motor.js";
+import { sistemKasasi, type Kasa } from "./kasa.js";
 import { UyumluMotor } from "./uyumlu.js";
 import { Orkestrator, type Cevap } from "./orkestrator.js";
 import { KovanHatasi } from "./ortak.js";
@@ -55,6 +56,8 @@ export interface KurulumSecenekleri {
   motorlar?: Map<string, Motor>;
   /** Dış ayar dosyası; verilmezse KOVAN_AYAR, null ise hiç okunmaz. */
   dis_ayar?: string | null;
+  /** API anahtarı kasası; verilmezse işletim sisteminin kasası, null ise kasa yok. */
+  kasa?: Kasa | null;
 }
 
 export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): Promise<Kovan> {
@@ -66,11 +69,12 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
   fs.mkdirSync(calisma, { recursive: true });
   const surum = String(JSON.parse(fs.readFileSync(path.join(kok, "package.json"), "utf8")).version ?? "?");
 
+  const kasa = secenek.kasa === undefined ? sistemKasasi() : secenek.kasa;
   const motorlar = secenek.motorlar ?? new Map<string, Motor>([
     ...(cfg.claude ? [["claude", new ClaudeMotoru(cfg.claude_yolu, cfg.api_anahtarini_yoksay)] as [string, Motor]] : []),
     ["deneme", new DenemeMotoru(cfg.deneme_gecikme_sn)],
     ...Object.entries(cfg.motorlar).map(([ad, m]): [string, Motor] =>
-      [ad, m.tur === "openai" ? new UyumluMotor(ad, m) : new OllamaMotoru(ad, m.adres, m.model, cfg.claude_yolu)]),
+      [ad, m.tur === "openai" ? new UyumluMotor(ad, m, kasa) : new OllamaMotoru(ad, m.adres, m.model, cfg.claude_yolu)]),
   ]);
   const depo = new Depo(calisma);
   const ork = new Orkestrator(calisma, cfg, depo, kartlar, akislar, motorlar);
@@ -121,6 +125,30 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
       },
     };
   });
+
+  // Kurum LLM'inin API anahtarı (Ayarlar ekranı). Anahtar yalnızca gelir; hiçbir yanıtta, günlükte ya da dosyada yok.
+  const uyumluMotor = (ad: string): UyumluMotor => {
+    const m = motorlar.get(ad);
+    if (!(m instanceof UyumluMotor)) throw new KovanHatasi(`OpenAI uyumlu motor yok: ${ad}`, 404);
+    return m;
+  };
+  const baglantiSonucu = async (m: UyumluMotor) => {
+    const hazir = await m.saglik(true);
+    return { ...(await m.durumOzeti()), hazir, modeller: m.modeller.slice(0, 50) };
+  };
+  app.post<{ Params: { ad: string } }>("/api/motorlar/:ad/anahtar", async (req) => {
+    const m = uyumluMotor(req.params.ad);
+    const g = govde(req.body);
+    if (typeof g.anahtar !== "string") throw new KovanHatasi("API anahtarı gerekli.");
+    m.anahtarAyarla(g.anahtar, g.kalici === true);
+    return baglantiSonucu(m);
+  });
+  app.post<{ Params: { ad: string } }>("/api/motorlar/:ad/anahtar-sil", async (req) => {
+    const m = uyumluMotor(req.params.ad);
+    m.anahtarSil();
+    return baglantiSonucu(m);
+  });
+  app.post<{ Params: { ad: string } }>("/api/motorlar/:ad/dene", async (req) => baglantiSonucu(uyumluMotor(req.params.ad)));
 
   app.get("/api/ajanlar", async () => [...kartlar.values()].map((k): AjanOzeti => {
     const m = motorlar.get(k.motor);

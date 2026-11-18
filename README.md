@@ -520,10 +520,22 @@ Tarayıcı ──► Kovan (127.0.0.1:8765) ──► Kovan ajanı (alt süreç)
 
 ### Kısaca: beş adım
 1. Ayar dosyasını repo dışına koy: `ornekler/kurum-ayar.ornek.yaml` → `~/.kovan/kovan.yaml`.
-2. İçinde `adres`, `model` ve anahtarın **yerini** yaz (`anahtar_degiskeni` ya da `anahtar_dosyasi`); anahtarın kendisini değil.
+2. İçinde `adres` ve `model`'i yaz. Anahtarın kendisini yazma.
 3. Anahtar başlığı `Authorization: Bearer` değilse `anahtar_basligi` yaz (ör. `api-key`, `x-api-key`).
-4. Bağlantıyı aşağıdaki gibi elle dene, sonra `npm start -- --ayar ~/.kovan/kovan.yaml`.
+4. `npm start -- --ayar ~/.kovan/kovan.yaml`, sonra arayüzde **Ayarlar** → API anahtarını gir → **Kaydet ve dene**.
 5. Üst çubukta motor **hazır** görünsün; önce Deneme, sonra Mini akışla küçük bir fikir koş.
+
+### API anahtarı: Ayarlar ekranı
+Anahtarı tarayıcıdan, **Ayarlar** sayfasından girersin. **Kaydet ve dene**, `GET /v1/models` ile bağlantıyı hemen dener; yanlış anahtar, yanlış başlık ya da ulaşılamayan adres orada söylenir.
+
+| Nerede durur | Ne zaman |
+|---|---|
+| Yalnızca bellekte (varsayılan) | Kovan kapanınca silinir; her açılışta yeniden girersin. Diske hiçbir şey yazılmaz |
+| İşletim sisteminin kasası ("kalıcı" kutusu) | Mac'te Anahtar Zinciri, Linux'ta Secret Service (`secret-tool`). Kovan açılınca oradan okur. **Anahtarı sil** kasadan da siler |
+
+- Anahtar yalnızca bu makinedeki Kovan sunucusuna gider. Hiçbir yanıtta, `/api/durum`'da, günlükte ya da ayar dosyasında görünmez; kasaya komut satırından değil stdin'den yazılır.
+- Sıra: ekrandan girilen > `anahtar_dosyasi` > `anahtar_degiskeni` > kasa. Otomasyon için dosya ve ortam değişkeni hâlâ çalışır.
+- Windows'ta kasa desteği yok (denenmedi); anahtar yalnızca bellekte tutulur.
 
 En küçük ayar:
 ```yaml
@@ -691,7 +703,9 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 | Ajanlar çok soru soruyor | Ortak karar açık mı (`ortak_karar.acik`)? `en_fazla_soru_turu`'nu düşür ya da `ajan_sorulari: false` yap |
 | Ekip hep anlaşamıyor, sorular bana geliyor | `ortak_karar.kural: cogunluk` yap ya da kurula üye ekle (`ortak_karar.kurul`) |
 | "Teslim planı okunamadı" | Proje Yöneticisi `kovan-plan` bloğunu bozuk yazmış; "Notumla geri gönder" ile teslim planına döndür |
-| "API anahtarı yok: ... ortam değişkeni boş" | Kovan'ı başlattığın kabukta değişkeni ayarla. Finder'dan çift tıklayınca kabuk ayarları gelmez; `anahtar_dosyasi` kullan |
+| "API anahtarı yok: ... ortam değişkeni boş" | En kolayı: **Ayarlar** ekranından gir. Ya da Kovan'ı başlattığın kabukta değişkeni ayarla; Finder'dan çift tıklayınca kabuk ayarları gelmez |
+| "Bu makinede işletim sistemi kasası yok" | Windows'ta ya da `secret-tool` kurulu olmayan Linux'ta kalıcı kayıt yok; anahtar yalnızca bellekte durur. Linux'ta `libsecret-tools` paketini kur |
+| "macOS Anahtar Zinciri'ne yazılamadı" | Anahtar Zinciri kilitli olabilir; aç ve tekrar dene. Anahtar tırnak ya da ters bölü içeriyorsa kalıcı kaydetmeden kullan |
 | "API anahtarı reddedildi (HTTP 401)" | Anahtarı ve `anahtar_basligi`'nı kontrol et (ör. ağ geçidi `api-key` ya da `x-api-key` bekliyor olabilir) |
 | "sertifikası doğrulanamadı" | İç ağ sertifikası kurumun kök sertifikasıyla imzalı: `ca_dosyasi` ile PEM dosyasını ver |
 | "Model sunucuda yok" | `model` değeri `GET /v1/models`'taki `id` ile birebir aynı olmalı |
