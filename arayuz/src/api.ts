@@ -39,11 +39,13 @@ export const api = {
   fikirler: () => istek<FikirOzeti[]>("/api/fikirler"),
   fikir: (id: string) => istek<FikirDetayi>(yolu(id)),
   dosya: (id: string, yol: string) => istek<DosyaIcerigi>(`${yolu(id)}/dosya?yol=${encodeURIComponent(yol)}`),
-  yeniFikir: (g: { baslik: string; metin: string; profil: string; motor: Mod }) => istek<{ id: string }>("/api/fikirler", g),
+  yeniFikir: (g: { baslik: string; metin: string; profil: string; motor: Mod; kaynaklar?: string[]; hedef_yigin?: string }) =>
+    istek<{ id: string }>("/api/fikirler", g),
   karar: (id: string, secim: string, not: string, hedef?: string | null) => istek<{ ok: true }>(`${yolu(id)}/karar`, { secim, not, hedef }),
   cevap: (id: string, cevaplar: Cevap[]) => istek<{ ok: true }>(`${yolu(id)}/cevap`, { cevaplar }),
   durdur: (id: string) => istek<{ ok: true }>(`${yolu(id)}/durdur`, {}),
   devam: (id: string) => istek<{ ok: true }>(`${yolu(id)}/devam`, {}),
+  yeniSurum: (id: string, metin: string) => istek<{ id: string }>(`${yolu(id)}/surum`, { metin }),
 };
 
 export const onizlemeAdresi = (id: string, yol: string) =>

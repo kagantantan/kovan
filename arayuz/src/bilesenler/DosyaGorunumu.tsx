@@ -1,23 +1,34 @@
 // Fikrin dosyaları: ajanların belgeleri, onay kurulu incelemeleri, kod ve karar defteri.
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, onizlemeAdresi, type Adim, type FikirDetayi } from "../api";
 import { adimDurumu, boyut, zaman } from "../bicim";
 import { useYokla } from "../kullan";
-import { Markdown } from "./Markdown";
+import { Markdown, type AtifTiklama } from "./Markdown";
 import { Simge } from "./Simge";
 
-type Sekme = "belgeler" | "incelemeler" | "kod" | "kararlar";
+type Sekme = "belgeler" | "incelemeler" | "kod" | "kaynak" | "kararlar";
 
 const BELGE_ADI: Record<string, string> = {
-  fikir: "Fikir metni", brif: "Brif", analiz: "Analiz", "ux-ozeti": "UX özeti", "teknik-plan": "Teknik plan",
-  "test-senaryolari": "Test senaryoları", "test-ozeti": "Test özeti", "be-notu": "Backend notu", "fe-notu": "Frontend notu",
-  kararlar: "Kararların",
+  fikir: "Fikir metni", "kaynak-envanteri": "Kaynak envanteri", "mevcut-sistem": "Mevcut sistem analizi", brif: "Kapsam ve kabul paketi", analiz: "Analiz belgesi", "ux-ozeti": "UX özeti", "teknik-plan": "Teknik plan",
+  "teslim-plani": "Teslim planı", "test-senaryolari": "Test senaryoları", "test-altyapisi": "Test altyapısı", "test-ozeti": "Test özeti",
+  "be-notu": "Backend notu", "fe-notu": "Frontend notu", birlestirme: "Birleştirme", entegrasyon: "Entegrasyon kılavuzu", teslim: "Teslim paketi",
+  "gelisim-onerileri": "Gelişim önerileri", "gelisim-defteri": "Gelişim defteri", kararlar: "Kararlar",
 };
 const BELGE_SIRASI = Object.keys(BELGE_ADI);
 
 const belgeAnahtari = (yol: string) => yol.replace(/^belgeler\//, "").replace(/\.md$/, "");
+
+/** p1-kabul-testi -> "P1 kabul testi", v2-p3-is-notu -> "P3 iş notu" */
+export function belgeAdi(anahtar: string): string {
+  if (BELGE_ADI[anahtar]) return BELGE_ADI[anahtar];
+  const m = /^(?:v\d+-)?(p\d+)-(kabul-testi|is-notu)$/.exec(anahtar);
+  if (m) return `${m[1].toUpperCase()} ${m[2] === "kabul-testi" ? "kabul testi" : "iş notu"}`;
+  return anahtar;
+}
 const sekmesi = (yol: string): Sekme | null =>
-  yol.startsWith("belgeler/") ? "belgeler" : yol.startsWith("incelemeler/") ? "incelemeler" : yol.startsWith("kod/") ? "kod" : null;
+  yol.startsWith("belgeler/") ? "belgeler" : yol.startsWith("incelemeler/") ? "incelemeler"
+    : yol.startsWith("kod/kaynak/") ? "kaynak" : yol.startsWith("kod/") ? "kod" : null;
+const KAYNAK_LISTESI = 400;
 
 /** incelemeler/analiz-tur1-urun-sahibi-adim5.md -> parçalar */
 function incelemeCoz(yol: string) {
@@ -34,8 +45,16 @@ interface Props {
   canli: boolean;
 }
 
+type Vurgu = { yol: string; ilk: number; son: number };
+
 export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli }: Props) {
   const [sekme, setSekme] = useState<Sekme>(() => (secili && sekmesi(secili)) || "belgeler");
+  const [vurgu, setVurgu] = useState<Vurgu | null>(null);
+  // Belgedeki kod atfına tıklanınca eski sistemin dosyası o satırlar vurgulanarak açılır
+  const atifAc: AtifTiklama = (yol, ilk, son) => {
+    setVurgu({ yol: `kod/${yol}`, ilk, son });
+    onSec(`kod/${yol}`);
+  };
   useEffect(() => {
     const s = secili ? sekmesi(secili) : null;
     if (s) setSekme(s);
@@ -43,18 +62,24 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
 
   const asamaAdlari = useMemo(() => new Map(detay.asamalar.map((a) => [a.id, a.ad])), [detay.asamalar]);
   const adimlar = useMemo(() => new Map<number, Adim>(detay.adimlar.map((a) => [a.id, a])), [detay.adimlar]);
-  const { belgeler, incelemeler, kod } = detay.dosyalar;
+  const { belgeler, incelemeler, kod, kaynak } = detay.dosyalar;
 
   const sekmeler: { id: Sekme; ad: string; sayi: number }[] = [
     { id: "belgeler", ad: "Belgeler", sayi: belgeler.length },
     { id: "incelemeler", ad: "İncelemeler", sayi: incelemeler.length },
     { id: "kod", ad: "Kod", sayi: kod.length },
-    ...(detay.kararlar.length ? [{ id: "kararlar" as Sekme, ad: "Kararların", sayi: detay.kararlar.length }] : []),
+    ...(kaynak.length ? [{ id: "kaynak" as Sekme, ad: "Mevcut sistem", sayi: kaynak.length }] : []),
+    ...(detay.kararlar.length ? [{ id: "kararlar" as Sekme, ad: "Kararlar", sayi: detay.kararlar.length }] : []),
   ];
 
   const siraliBelgeler = [...belgeler].sort((a, b) => {
-    const ia = BELGE_SIRASI.indexOf(belgeAnahtari(a.yol));
-    const ib = BELGE_SIRASI.indexOf(belgeAnahtari(b.yol));
+    const sira = (y: string) => {
+      const k = belgeAnahtari(y);
+      const i = BELGE_SIRASI.indexOf(k);
+      return i >= 0 ? i : /^(?:v\d+-)?p\d+-/.test(k) ? BELGE_SIRASI.indexOf("test-altyapisi") + 0.5 : -1;
+    };
+    const ia = sira(a.yol);
+    const ib = sira(b.yol);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.yol.localeCompare(b.yol);
   });
 
@@ -107,7 +132,7 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
                 {siraliBelgeler.map((d) => (
                   <li key={d.yol}>
                     <button type="button" className="dosya-oge" aria-current={secili === d.yol} onClick={() => onSec(d.yol)}>
-                      {BELGE_ADI[belgeAnahtari(d.yol)] ?? belgeAnahtari(d.yol)}
+                      {belgeAdi(belgeAnahtari(d.yol))}
                     </button>
                   </li>
                 ))}
@@ -147,27 +172,66 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
                 })}
               </ul>
             ) : <p className="bos-not">Kod aşamaları başlayınca dosyalar burada görünür.</p>)}
+            {sekme === "kaynak" && (
+              <div className="dosya-grup">
+                <div className="dosya-grup-ad">Eski sistem, kilitli ve salt okunur</div>
+                <ul>
+                  {kaynak.slice(0, KAYNAK_LISTESI).map((d) => {
+                    const rel = d.yol.replace(/^kod\/kaynak\//, "");
+                    const bol = rel.lastIndexOf("/");
+                    return (
+                      <li key={d.yol}>
+                        <button type="button" className="dosya-oge dosya-oge--kod" aria-current={secili === d.yol} onClick={() => onSec(d.yol)}>
+                          {bol > 0 && <span className="dosya-klasor">{rel.slice(0, bol + 1)}</span>}
+                          <span>{rel.slice(bol + 1)}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {kaynak.length > KAYNAK_LISTESI && <p className="bos-not">+{kaynak.length - KAYNAK_LISTESI} dosya daha; hepsi Kaynak envanteri belgesinde.</p>}
+              </div>
+            )}
           </nav>
-          <DosyaIcerigi fikirId={fikirId} yol={secili} canli={canli} />
+          <DosyaIcerigi fikirId={fikirId} yol={secili} canli={canli} onAtif={detay.dosyalar.kaynak.length ? atifAc : undefined}
+            vurgu={vurgu && vurgu.yol === secili ? vurgu : null} />
         </div>
       )}
     </div>
   );
 }
 
-function DosyaIcerigi({ fikirId, yol, canli }: { fikirId: string; yol: string | null; canli: boolean }) {
+/** Satır numaralı kod; vurgu verilirse o satırlar işaretlenir ve görünür alana kaydırılır. */
+function SatirliKod({ metin, vurgu }: { metin: string; vurgu: Vurgu | null }) {
+  const satirlar = metin.split("\n");
+  if (satirlar.length > 1 && satirlar.at(-1) === "") satirlar.pop();
+  const kok = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    if (vurgu) kok.current?.querySelector(`[data-satir="${vurgu.ilk}"]`)?.scrollIntoView({ block: "center" });
+  }, [vurgu, metin]);
+  return (
+    <ol className="kod kod--satirli" ref={kok} style={{ ["--hane" as string]: String(satirlar.length).length }}>
+      {satirlar.map((s, i) => (
+        <li key={i} data-satir={i + 1} className={vurgu && i + 1 >= vurgu.ilk && i + 1 <= vurgu.son ? "satir--vurgu" : undefined}>{s || " "}</li>
+      ))}
+    </ol>
+  );
+}
+
+function DosyaIcerigi({ fikirId, yol, canli, onAtif, vurgu }: { fikirId: string; yol: string | null; canli: boolean; onAtif?: AtifTiklama; vurgu: Vurgu | null }) {
   const { veri, hata } = useYokla(() => (yol ? api.dosya(fikirId, yol) : Promise.resolve(null)), yol && canli ? 4000 : null, `${fikirId}:${yol}`);
   if (!yol) return <div className="dosya-icerik"><p className="bos-not">Soldan bir dosya seç ya da zaman çizelgesinde bir adıma tıkla.</p></div>;
   const uzanti = yol.split(".").pop()?.toLowerCase() ?? "";
   let govde: ReactNode = <p className="bos-not">Yükleniyor...</p>;
   if (hata) govde = <p className="hata-satiri"><Simge ad="uyari" /> {hata}</p>;
   else if (veri) {
-    if (uzanti === "md") govde = <Markdown metin={veri.icerik} />;
+    if (uzanti === "md") govde = <Markdown metin={veri.icerik} onAtif={onAtif} />;
     else if (uzanti === "json") {
       let metin = veri.icerik;
       try { metin = JSON.stringify(JSON.parse(veri.icerik), null, 2); } catch { /* olduğu gibi */ }
       govde = <pre className="kod">{metin}</pre>;
-    } else govde = <pre className="kod">{veri.icerik}</pre>;
+    } else if (veri.icerik.startsWith("(ikili dosya")) govde = <p className="bos-not">{veri.icerik}</p>;
+    else govde = <SatirliKod metin={veri.icerik} vurgu={vurgu} />;
   }
   const html = yol.startsWith("kod/") && (uzanti === "html" || uzanti === "htm");
   return (
@@ -189,17 +253,26 @@ function DosyaIcerigi({ fikirId, yol, canli }: { fikirId: string; yol: string | 
 function KararDefteri({ detay }: { detay: FikirDetayi }) {
   return (
     <div className="defter">
-      <p className="defter-not">Ajanların sorduğu ve senin cevapladığın kararlar. Sonraki bütün ajanlar bunları bağlayıcı kural olarak görür.</p>
+      <p className="defter-not">Ajanların sorduğu sorular ve verilen kararlar. Ekip oybirliğiyle karar verdiyse sana sorulmadı; anlaşamadıysa sen karar verdin.
+        Sonraki bütün ajanlar bunları bağlayıcı kural olarak görür.</p>
       <ol className="defter-liste">
         {detay.kararlar.map((k, i) => (
           <li key={`${k.zaman}-${i}`} className="defter-kayit">
             <div className="defter-ust">
               <span className="soru-cip">{k.baslik}</span>
+              <span className={`rozet ${k.karar_veren === "ekip" ? "rozet--iyi" : "rozet--oneri"}`}>
+                {k.karar_veren === "ekip" ? `ekip kararı, ${k.kural === "cogunluk" ? "çoğunluk" : "oybirliği"}` : "senin kararın"}
+              </span>
               <span className="defter-kim">{k.soran}, {k.asama_ad ?? "-"} aşaması</span>
               <span className="defter-zaman">{zaman(k.zaman)}</span>
             </div>
             <p className="defter-soru">{k.soru}</p>
             <p className="defter-cevap">{k.cevap}</p>
+            {k.oylar && k.oylar.length > 0 && (
+              <p className="defter-oylar">
+                {k.oylar.map((o) => <span key={o.ajan} title={o.gerekce}><b>{o.kisa}</b> {o.insana ? "sana bıraktı" : o.secim.join(", ")}</span>)}
+              </p>
+            )}
           </li>
         ))}
       </ol>

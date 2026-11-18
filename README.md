@@ -1,26 +1,33 @@
 # Kovan · sınırları belli ajanlardan bir yazılım ekibi
 
-Bir fikir yazıyorsun. Ürün Sahibi, İş Analisti, UX Tasarımcı, Mimar, Test Analisti ve Test Otomasyon sırayla kendi işini yapıyor. Kodu BE ve FE yazılımcıları yazıyor. Her aşama bir onay kurulundan geçiyor, testler gerçekten çalıştırılıyor. Ajanlar takıldıkları yerde sana seçenekli soru soruyor; son söz sende. Hepsini tarayıcıdan izleyip yönetiyorsun.
+Bir fikir yazıyorsun. Kod yazılmadan önce ekip derin planlama yapıyor: Ürün Sahibi kapsamı, İş Analisti analizi, UX Tasarımcı prototipi, Mimar teknik planı çıkarıyor; Proje Yöneticisi işi sıralı iş kalemlerine (P1, P2...) bölüyor; Test Analisti senaryoları, Test Otomasyon test altyapısını hazırlıyor. Sonra her kalem önce kendi kabul testiyle başlıyor, testler kilitleniyor, kodu BE ya da FE yazılımcısı ancak o zaman yazıyor. Her aşama bir onay kurulundan geçiyor, testler gerçekten çalıştırılıyor.
 
-**Hibrit çalışır:** kodu yerelde **Qwen** (Ollama) yazar; analiz, tasarım ve onayları **Claude** yapar.
+Ajanlar takıldıklarında **önce kendi aralarında oy veriyor**; oybirliği çıkarsa sana sorulmuyor. Anlaşamadıklarında ya da karar para, hukuki risk gibi senin vermen gereken türdense sana seçenekli soru geliyor, kimin neyi seçtiğiyle birlikte. Teslimden sonra Ürün Sahibi gelişim önerileri getiriyor; her birini sana "olmalı mı?" diye soruyor, kabul ettiklerinle yeni sürüm başlıyor. Hepsini tarayıcıdan izleyip yönetiyorsun.
+
+Sıfırdan bir ürün yerine **var olan bir sistemi de yeniden yazdırabilirsin (replatform)**: eski kodu ve analiz dokümanını verirsin; ekip önce sistemin bugün gerçekte ne yaptığını koda atıflarla çıkarır, doküman ile kod arasındaki farkları karara bağlar (anlaşamazsa sana sorar), sonra temiz bir mimariyle ve eski sistemin çıktısıyla karşılaştırarak yeniden yazar. Çıktı, kendi sistemine entegre edeceğin kod ve bir entegrasyon kılavuzudur.
+
+**Hibrit çalışır:** kodu yerelde **Qwen** (Ollama) yazar; analiz, tasarım ve onayları **Claude** yapar. Kod makineden çıkmamalıysa **Hepsi yerel** modu bütün ajanları yerel modelde çalıştırır.
 **Qwen yazar, Claude onaylar, testler karar verir, sen yön verirsin.**
 
-![Mevzuat ajanı inceleme sırasında soruyor](docs/soru-karti.png)
+![Ekip anlaşamadı: Mevzuat'ın sorusu oylarla birlikte geliyor](docs/soru-karti.png)
 
 ---
 
 ## İçindekiler
 1. [Amaç](#amaç)
 2. [Mimari](#mimari)
-3. [İnsan döngüde: sorular ve kararlar](#insan-döngüde-sorular-ve-kararlar)
-4. [Hızlı başlangıç](#hızlı-başlangıç)
-5. [Hibrit için yerel Qwen kurulumu](#hibrit-için-yerel-qwen-kurulumu)
-6. [Ekip ve onay kurulları](#ekip-ve-onay-kurulları)
-7. [Üretilen uygulamanın yığını](#üretilen-uygulamanın-yığını)
-8. [Büyütmek](#büyütmek)
-9. [Kovan'ı geliştirmek](#kovanı-geliştirmek)
-10. [Sorun giderme](#sorun-giderme)
-11. [Yol haritası](#yol-haritası)
+3. [Kararlar: önce ekip, gerekirse sen](#kararlar-önce-ekip-gerekirse-sen)
+4. [Derin planlama ve iş kalemleri](#derin-planlama-ve-iş-kalemleri)
+5. [Gelişim önerileri ve yeni sürüm](#gelişim-önerileri-ve-yeni-sürüm)
+6. [Replatform: mevcut sistemi yeniden yazmak](#replatform-mevcut-sistemi-yeniden-yazmak)
+7. [Hızlı başlangıç](#hızlı-başlangıç)
+8. [Hibrit için yerel Qwen kurulumu](#hibrit-için-yerel-qwen-kurulumu)
+9. [Ekip ve onay kurulları](#ekip-ve-onay-kurulları)
+10. [Üretilen uygulamanın yığını](#üretilen-uygulamanın-yığını)
+11. [Büyütmek](#büyütmek)
+12. [Kovan'ı geliştirmek](#kovanı-geliştirmek)
+13. [Sorun giderme](#sorun-giderme)
+14. [Yol haritası](#yol-haritası)
 
 ---
 
@@ -40,17 +47,19 @@ Bir yazılım ekibinin rollerini, **sınırları sistemce uygulanan** dar rollü
 - Her aşama bir **Üret → Doğrula** döngüsüdür. Doğrulama iki katmanlıdır: LLM'den bağımsız **çalışan testler** ve başka rollerden oluşan bir **onay kurulu**.
 - Testler **koddan önce** yazılır ve **kilitlenir**. Yazılımcı testi değiştirip "geçirmiş" gibi yapamaz.
 - **Üreten ve onaylayan model farklıdır** (hibritte Qwen yazar, Claude onaylar). Farklı modeller farklı hataları yakalar.
-- **İnsan döngüdedir:** yanlış bir varsayım işi boşa çıkaracaksa ajan sana açıklamalı seçeneklerle sorar. Tur sınırında, kalıcı hatada ve teslimde de karar seninle.
+- **Önce plan, sonra kod:** kapsam, analiz, teknik plan ve teslim planı onaylanmadan kod yazılmaz; iş küçük kalemlere bölünür, her kalem kendi kabul testiyle başlar.
+- **Önce ekip, sonra sen:** yanlış bir varsayım işi boşa çıkaracaksa ajan soru sorar; soru önce ekipte oylanır, anlaşamazlarsa açıklamalı seçeneklerle sana gelir. Para ve hukuki risk gibi kararlar doğrudan sende. Tur sınırında, kalıcı hatada ve teslimde de karar seninle.
 
 ### Hedefler
 - Kişisel proje fikirlerini uçtan uca, çalışan ve testli koda dönüştürmek.
+- Var olan bir sistemi anlayıp temiz, testli ve korunan kurallarda eskisiyle eşdeğer biçimde yeniden yazmak (replatform).
 - Her adımı görünür kılmak: kim, ne zaman, kaçıncı turda, hangi motorda, kaç token, ne kadar sürede.
 - Maliyeti dengelemek: ağır kodlama yerelde (Qwen), muhakeme ve onay Claude'da.
 - Ölçerek büyümek: yeni ajan, ölçülen bir hata türünü yakalamak için eklenir. "Daha çok ajan daha iyidir" varsayımı yok.
 
 ### Kapsam dışı
 - Çok kullanıcılı ya da internete açık kurulum. Kovan yalnızca `127.0.0.1`'de çalışır.
-- Kurumsal kod ve kurum verisi. Kişisel projeler içindir.
+- Kurum içi kodu kurumunun izin vermediği biçimde işlemek. Kodun nereye gittiğini mod belirler: Hepsi yerel'de bu makinede kalır, Hibrit ve Hepsi Claude'da Claude'a gider (bkz. [Gizlilik](#gizlilik-hangi-modda-ne-makineden-çıkar)).
 - Tam otonomi. İnsan kapısı bilinçli bir tasarım kararıdır.
 
 ---
@@ -79,7 +88,9 @@ Kovan tek bir Node.js sürecidir (TypeScript, `tsx` ile derlemeden çalışır).
 
 | Dosya | Sorumluluk |
 |---|---|
-| `sunucu/src/orkestrator.ts` | Durum makinesi. Aşamaları sırayla yürütür; Üret → Doğrula döngüsü, paralel onay kurulu, ajan soruları ve karar defteri, yazma alanı ve kilit denetimi, süre/bütçe/tur sınırları, insan kararları, yeniden başlatmada kurtarma |
+| `sunucu/src/orkestrator.ts` | Durum makinesi. Aşamaları sırayla yürütür; Üret → Doğrula döngüsü, paralel onay kurulu, ortak karar (oylama), ajan soruları ve karar defteri, iş kalemlerinin açılması, gelişim önerileri ve yeni sürüm, yazma alanı ve kilit denetimi, süre/bütçe/tur sınırları, yeniden başlatmada kurtarma |
+| `sunucu/src/kaynak.ts` | Replatform: mevcut sistemin kaynaklarını içe alır (kopya, atlananlar, Word → HTML, Windows-1254/UTF-16 → UTF-8, zip, sınırlar), kaynak envanteri, kod atıfları denetimi |
+| `sunucu/src/plan.ts` | `kovan-plan` ve `kovan-gelisim` bloklarını okur ve denetler; kalem şablonunu her kalem için somut aşamalara açar |
 | `sunucu/src/motor.ts` | Motorlar. `ClaudeMotoru` (abonelik), `OllamaMotoru` (aynı harness + yerel model), `DenemeMotoru` (token harcamaz). `claude --help`'ten bayrak tespiti, JSON çözümleme, kalıcı/geçici hata ayrımı, soru bloğu ayrıştırma |
 | `sunucu/src/sunucu.ts` | Fastify: derlenmiş arayüz, JSON API, ajan çıktılarının yalıtılmış önizlemesi, host ve köken denetimi |
 | `sunucu/src/depo.ts` | Fikir ve adım kayıtları: `calisma/F-xxx/.kovan/fikir.json` ve `adimlar.json`, atomik yazım |
@@ -94,7 +105,9 @@ Kovan tek bir Node.js sürecidir (TypeScript, `tsx` ile derlemeden çalışır).
 ```mermaid
 flowchart TD
     G["Aşamaya giriş"] --> U["Üret<br/>aşamanın ajanı"]
-    U -->|"kovan-soru bloğu"| SQ[["Sen cevaplarsın<br/>karar defterine yazılır"]]
+    U -->|"kovan-soru bloğu"| OK{"Ekip oylar<br/>PO, TKM, ANLZ"}
+    OK -->|oybirliği| U
+    OK -->|anlaşamadı| SQ[["Sen cevaplarsın<br/>oylar kartta"]]
     SQ --> U
     U --> SN["Sınır denetimi<br/>yazma alanı + kilit"]
     SN --> TK{"Test komutu<br/>(varsa)"}
@@ -102,7 +115,9 @@ flowchart TD
     TK -->|yeşil| KU{"Onay kurulu<br/>paralel"}
     KU -->|hepsi ONAY| IL["İlerle<br/>gerekirse kilitle"]
     KU -->|DÜZELT| B
-    KU -->|SORU| SK[["Sen cevaplarsın"]]
+    KU -->|SORU| OK2{"Ekip oylar"}
+    OK2 -->|oybirliği| U
+    OK2 -->|anlaşamadı| SK[["Sen cevaplarsın"]]
     SK -->|"karar + bulgular"| U
     B --> TS{"Tur sınırı?"}
     TS -->|hayır| U
@@ -123,7 +138,7 @@ sequenceDiagram
     participant M as Motor
     participant C as claude -p
     participant L as Model
-    O->>O: istem = görev + insan kararları + izinli girdiler + düzeltme istekleri
+    O->>O: istem = görev + alınan kararlar + izinli girdiler + düzeltme istekleri
     O->>O: kod/ anlık kopyası (yazma alanı denetimi için)
     O->>M: AjanCagrisi (rol, model, araçlar, izinli komutlar, cwd, süre)
     M->>C: bayraklar + ortam (abonelik ya da Ollama)
@@ -157,30 +172,32 @@ Sunucu kapanırsa yarıda kalan işler bir sonraki açılışta `bekliyor` durum
 
 ```mermaid
 flowchart TB
-    subgraph G1 ["Analiz ve tasarım · Claude"]
+    subgraph G1 ["Derin planlama · Claude · kod yok"]
         direction LR
-        F(["Fikir"]) --> B["Brif<br/>PO"] --> A["Analiz<br/>ANLZ"] --> UX["UX tasarım<br/>UX"] --> P["Teknik plan<br/>TKM"]
+        F(["Fikir"]) --> B["Kapsam ve kabul paketi<br/>PO"] --> A["Analiz belgesi<br/>ANLZ"] --> UX["UX tasarım<br/>UX"] --> P["Teknik plan<br/>TKM"] --> TP["Teslim planı<br/>PJY: P1, P2, P3"]
+        TP --> TS["Test senaryoları<br/>KTST"] --> TA["Test altyapısı<br/>OTOM"]
     end
-    subgraph G2 ["Test · Claude"]
+    subgraph G2 ["Her iş kalemi için, bağımlılık sırasıyla"]
         direction LR
-        TS["Test senaryoları<br/>KTST"] --> OT["Otomatik testler<br/>OTOM · kilitlenir"]
+        KT["Kabul testi<br/>OTOM, kilitlenir"] --> IK["İş kalemi<br/>BCKD ya da FE, yerel Qwen"]
     end
-    subgraph G3 ["Kod · yerel Qwen"]
+    subgraph G3 ["Teslim"]
         direction LR
-        BE["BE geliştirme<br/>BCKD"] --> FE["FE geliştirme<br/>FE"]
+        BR["Birleştirme<br/>OTOM, bütün testler"] --> TE["Teslim paketi<br/>PJY"] --> K[["Kabul<br/>sen"]] --> GE["Gelişim önerileri<br/>PO, sana sorar"]
     end
-    G1 --> G2 --> G3 --> K[["Kabul<br/>sen"]]
+    G1 --> G2 --> G3
 ```
 
-Tam yığın akış yukarıdaki gibi. Standart akışta UX ve FE yok; Mini akış Brif → Otomatik testler → BE → Kabul.
+Tam yığın akış yukarıdaki gibi. Standart akışta UX ve FE kalemleri yok. Mini akış kısa yol: Brif → Otomatik testler → BE → Kabul (onay kurulu ve ortak karar yok).
 
-| Akış | Ne için | Aşamalar | Mutlu yolda çağrı |
+| Akış | Ne için | Aşamalar | Deneme motorunda çağrı (3 kalem) |
 |---|---|---|---|
-| **Mini** | küçük BE işleri, onay kurulu yok | Brif → Otomatik testler → BE → Kabul | 3 ajan + test koşumu |
-| **Standart (BE)** | arayüzsüz işler | yukarıdaki akışın UX ve FE'siz hali | 6 üretici + 12 onay |
-| **Tam yığın (FE+BE)** | arayüzlü işler | yukarıdaki akış | 8 üretici + 20 onay |
+| **Mini** | küçük BE işleri | Brif → Otomatik testler → BE → Kabul | 5 |
+| **Standart (BE)** | arayüzsüz işler | planlama (6 aşama) → kalemler → birleştirme → teslim → kabul → gelişim | ~64 |
+| **Tam yığın (FE+BE)** | arayüzlü işler | yukarıdaki + UX tasarım, FE kalemleri | ~64 |
+| **Replatform** | var olan bir sistemi yeniden yazmak | mevcut sistemi anlama → kapsam → hedef analiz → teknik plan → teslim planı → testler → kalemler → birleştirme → entegrasyon kılavuzu → teslim → kabul → gelişim | ~77 |
 
-Onay kurulunun bir maliyeti var. Küçük işi tam yığına sokma. Her soru ve düzeltme turu birkaç çağrı ekler.
+Derin planlama bilerek pahalı: kod yazılmadan önce kapsam, analiz, plan ve testler onaylanmış olur. Küçük işi tam yığına sokma; her soru ve düzeltme turu birkaç çağrı ekler.
 
 ### Sınır modeli: katmanlı savunma
 
@@ -195,6 +212,11 @@ Onay kurulunun bir maliyeti var. Küçük işi tam yığına sokma. Her soru ve 
 | Doğrulama | `bash test-be.sh` / `test-fe.sh` | Kod gerçekten çalıştırılır; LLM'in "çalışıyor" demesi yetmez |
 | Onay kurulu | paralel inceleyenler, JSON şemalı karar | Hepsi ONAY vermeden aşama geçmez |
 | **Soru sınırı** | orkestratör (`en_fazla_soru_turu`) | Ajan seni darlamaz; hak dolunca varsayımla devam etmesi söylenir |
+| **Ortak karar** | orkestratör (`ortak_karar`) | Sorular önce kurulda oylanır; oybirliği yoksa, oy okunamazsa ya da biri "sahibine bırak" derse sana gelir |
+| **Salt okunur kaynak** | kilit + salt okunur aşama | Eski sistemin kopyasına kimse yazamaz; Mevcut Sistem Analisti hiçbir dosyaya yazamaz, yazarsa geri alınır |
+| **Kod atıfları** | atıf denetimi | Mevcut sistem analizindeki her `kaynak/<dosya>:<satır>` gerçek bir dosya ve satıra gitmeli; uydurma atıf onay kuruluna gitmeden geri döner |
+| **Hepsi yerel** | motor seçimi | Oylar ve onaylar dahil hiçbir çağrı buluta gitmez; yerel motor yoksa iş durur, Claude'a düşülmez |
+| **Plan biçimi** | `kovan-plan` denetimi | Kalem kimlikleri, yazılımcı, bağımlılık ve döngü sistemce denetlenir; bozuk plan onay kuruluna gitmeden düzeltmeye döner |
 | Süre, bütçe, tur | orkestratör | Takılan adım durdurulur; sınırda karar sana kalır |
 | Önizleme yalıtımı | sandbox CSP | Ajanın yazdığı HTML, Kovan'a senin adına istek atamaz |
 | Host ve köken denetimi | sunucu | Başka bir site localhost'taki Kovan'a istek atamaz, DNS rebinding işe yaramaz |
@@ -206,19 +228,21 @@ Onay kurulunun bir maliyeti var. Küçük işi tam yığına sokma. Her soru ve 
 ```
 kovan/
 ├─ Baslat.command      çift tıkla (macOS)
-├─ kovan.yaml          ayarlar: mod, yerel motor, paralel iş, ajan soruları
-├─ ajanlar/            10 ajan kartı
-├─ akislar/            mini, standart, tam-yigin
+├─ Ollama-Kur.command  Qwen hibrit için tek tık kurulum (macOS)
+├─ kovan.yaml          ayarlar: mod, yerel motor, paralel iş, ajan soruları, ortak karar
+├─ ajanlar/            12 ajan kartı
+├─ akislar/            mini, standart, tam-yigin, replatform
+├─ ornekler/           reeskont-eski: replatformu denemek için kurgusal eski sistem
 ├─ sunucu/src/         Node.js + TypeScript sunucu ve orkestratör
 ├─ sunucu/test/        Vitest testleri
 ├─ arayuz/             Vite + React + TypeScript arayüz (derlenmiş hali arayuz/dist)
 └─ calisma/            (git'te yok) fikirlerin çıktıları
    └─ F-001/
-      ├─ belgeler/     brif, analiz, plan, senaryolar, kararlar.md  (_surumler/ eski sürümler)
+      ├─ belgeler/     brif, analiz, planlar, kalem notları, kararlar.md, gelisim-defteri.md  (_surumler/ eski sürümler)
       ├─ incelemeler/  her ONAY / DÜZELT / SORU kararı
-      ├─ kod/          tasarim/  testler/  backend/  frontend/  test-be.sh  test-fe.sh
+      ├─ kod/          kaynak/ (replatform, kilitli)  tasarim/  testler/  backend/  frontend/  test-be.sh  test-fe.sh
       ├─ gunluk/       her çağrının tam istemi, komutu ve ham çıktısı
-      └─ .kovan/       fikir.json, adimlar.json, kararlar.json, kilit kaydı, anlık kopya
+      └─ .kovan/       fikir.json, adimlar.json, kararlar.json, plan.json, gelisim.json, kilit kaydı, anlık kopya
 ```
 
 Her ajan çağrısı, test koşumu, soru ve karar `adimlar.json`'da bir kayıttır: aşama, tür, ajan, motor, model, tur, deneme, süre, token, maliyet, sonuç, özet ve ilgili dosya.
@@ -230,18 +254,19 @@ Her ajan çağrısı, test koşumu, soru ve karar `adimlar.json`'da bir kayıtt�
 3. **Doğrulama LLM'den bağımsız.** Testleri orkestratör çalıştırır; sonuç çıkış kodudur.
 4. **Testler koddan önce ve kilitli.** "Bitti"nin tanımı yazılımcıdan önce sabitlenir.
 5. **Üreten ≠ onaylayan.** Hibritte kodu Qwen yazar, Claude onaylar. Aynı modelin kendi hatasını görmesi zordur.
-6. **Sormak varsaymaktan ucuz, ama sınırlı.** Pahalı belirsizlikte ajan sorar; küçük konuda "VARSAYIM:" yazıp devam eder. Cevaplar karar defterinde birikir ve bağlayıcıdır.
-7. **Sonsuz döngü yok.** Tur sınırı ve kalıcı hata sana gider. Hibritte "Claude'a devret" bir kaçış kapısıdır.
-8. **Geri dönüşte yeniden doğrulama.** Sonraki aşamalar baştan yazılmaz; testler ve kurul tekrar bakar.
-9. **Tek makine.** localhost, JSON dosyaları, dosya sistemi. Kurulumu `Baslat.command` kadar basit.
-10. **Sürüm toleransı.** `claude --help` okunur, desteklenmeyen bayrak gönderilmez.
-11. **Abonelik yalıtımı.** Claude ajanlarında `ANTHROPIC_BASE_URL`/`ANTHROPIC_API_KEY` gibi yönlendirme değişkenleri temizlenir. Böylece yanlışlıkla API'ye ya da yerel modele gidilmez.
+6. **Sormak varsaymaktan ucuz, ama sınırlı.** Pahalı belirsizlikte ajan sorar; küçük konuda "VARSAYIM:" yazıp devam eder. Soruyu önce ekip oylar; sana yalnızca anlaşamadıkları ya da senin vermen gereken kararlar gelir. Kararlar defterde birikir ve bağlayıcıdır.
+7. **Kod, plandan sonra.** İş, bağımlılık sırasıyla küçük kalemlere bölünür; her kalemin kabul testi koddan önce yazılıp kilitlenir. Küçük ve net kalem, yerel modelin işini kolaylaştırır.
+8. **Sonsuz döngü yok.** Tur sınırı ve kalıcı hata sana gider. Hibritte "Claude'a devret" bir kaçış kapısıdır.
+9. **Geri dönüşte yeniden doğrulama.** Sonraki aşamalar baştan yazılmaz; testler ve kurul tekrar bakar.
+10. **Tek makine.** localhost, JSON dosyaları, dosya sistemi. Kurulumu `Baslat.command` kadar basit.
+11. **Sürüm toleransı.** `claude --help` okunur, desteklenmeyen bayrak gönderilmez.
+12. **Abonelik yalıtımı.** Claude ajanlarında `ANTHROPIC_BASE_URL`/`ANTHROPIC_API_KEY` gibi yönlendirme değişkenleri temizlenir. Böylece yanlışlıkla API'ye ya da yerel modele gidilmez.
 
 ---
 
-## İnsan döngüde: sorular ve kararlar
+## Kararlar: önce ekip, gerekirse sen
 
-Ajan bir karar veremediğinde ve yanlış bir varsayım işi boşa çıkaracaksa durur ve sana sorar. Soru her zaman aynı biçimde gelir:
+Ajan bir karar veremediğinde ve yanlış bir varsayım işi boşa çıkaracaksa durur ve soru sorar. Soru her zaman aynı biçimde gelir:
 
 - kısa bir **başlık** (ör. "Kişisel veri") ve tek başına anlaşılır **net bir soru**,
 - **2-4 seçenek**, her birinin altında seçilirse ne olacağını anlatan bir açıklama,
@@ -249,26 +274,37 @@ Ajan bir karar veremediğinde ve yanlış bir varsayım işi boşa çıkaracaksa
 - her zaman **kendi cevabını** yazabileceğin ya da seçimine not ekleyebileceğin bir alan,
 - birden çok seçenek seçilebilecekse çoklu seçim.
 
+**Ortak karar.** Soru önce sana değil, ekibe gider. Ürün Sahibi, Mimar ve Analist bağımsız oy verir; soruyu soranın önerisi de bir oydur. Hepsi aynı seçeneği seçerse karar ekibindir, sana sorulmaz ve deftere "ekip kararı, oybirliği" diye yazılır. Anlaşamazlarsa soru sana gelir: her seçeneğin yanında ona kimin oy verdiği, altında ekibin gerekçeleri durur.
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant A as Ajan
-    participant O as Orkestratör
+    participant A as Soran ajan
+    participant E as Kurul (PO, TKM, ANLZ)
     participant K as Sen
     participant D as Karar defteri
-    A->>O: kovan-soru bloğu ya da karar: SORU
-    O->>K: seçenekli soru kartı (+ bildirim, sekme rozeti)
-    K->>O: seçim ve/veya kendi cevabı
-    O->>D: başlık, soru, cevap, soran, aşama
-    O->>A: aynı adım yeniden: "İnsan kararları" istemde
-    Note over O,A: Onaycı sorduysa yazar ajan kararı ve aynı turdaki bulguları işler
+    A->>E: kovan-soru bloğu ya da karar: SORU
+    E->>E: bağımsız oylar (seçenek numarasıyla, tek cümle gerekçe)
+    alt oybirliği
+        E->>D: ekip kararı + oylar
+    else anlaşamadılar ya da biri "sahibine bırak" dedi
+        E->>K: soru kartı, seçeneklerin yanında oylar
+        K->>D: senin kararın + ekibin oyları
+    end
+    D->>A: aynı adım yeniden: "Alınan kararlar" istemde
 ```
 
-**İki kaynak:**
-- **Üreten ajan**, işe başlamadan ya da iş sırasında sorar. Örnek: Ürün Sahibi brifi yazmadan önce arayüz dilini sorar.
-- **Onaycı**, inceleme sırasında `"karar": "SORU"` verir. Örnek: Mevzuat, analizi incelerken kişisel veri toplanıp toplanmayacağını sorar.
+Bazı kararlar ekibin değildir. **Para ve bütçe, hukuki bir riski kabul etmek, geri dönüşü olmayan bir işlem, marka ya da iş stratejisi** gerektiren sorularda ajan `"insan": true` işaretler; bunlar oylanmadan doğrudan sana gelir. Kurul üyelerinden biri "bu karar sahibinin" derse (`insana_birak`), oy okunamazsa ya da aşamanın soru hakkı dolmuşsa da soru sana gelir. Varsayılan güvenli taraftır: emin olunamayan her durumda karar sende.
 
-**Karar defteri:** Cevapların `belgeler/kararlar.md` ve `.kovan/kararlar.json`'a yazılır. Sonraki bütün ajanların isteminde "İnsan kararları" bölümü olarak yer alır; ortak kurallar bunları bağlayıcı sayar. Arayüzde "Kararların" sekmesinde görünür, teslim özetine de girer.
+Ayarlar (`kovan.yaml`): `ortak_karar.kurul` (kimler oylar), `ortak_karar.kural` (`oybirligi` ya da `cogunluk`), `ortak_karar.acik`. Bir akışta kapatmak için akış dosyasına `ortak_karar: false` (Mini'de kapalı).
+
+**İki kaynak:**
+- **Üreten ajan**, işe başlamadan ya da iş sırasında sorar. Örnek: Ürün Sahibi brifi yazmadan önce arayüz dilini sorar; ekip oybirliğiyle "Türkçe" der.
+- **Onaycı**, inceleme sırasında `"karar": "SORU"` verir. Örnek: Mevzuat, analizi incelerken kişisel veri toplanıp toplanmayacağını sorar; ekip bölünür, soru sana gelir.
+
+**Karar defteri:** Kararlar `belgeler/kararlar.md` ve `.kovan/kararlar.json`'a yazılır: kimin karar verdiği (ekip ya da sen) ve oylar dahil. Sonraki bütün ajanların isteminde "Alınan kararlar" bölümü olarak yer alır; ortak kurallar bunları bağlayıcı sayar. Arayüzde "Kararlar" sekmesinde ve teslim özetinde ayrı ayrı görünür.
+
+**Mevzuat yalnızca gerektiğinde.** Mevzuat ajanı ilk incelemesinde fikirde kişisel veri, ödeme, sektörel düzenleme gibi bir konu yoksa `"kapsam_disi": true` der; sonraki aşamalarda (`atlanabilir: true` olan yerlerde) çağrılmaz, zaman çizelgesinde "Kapsam dışı" notu düşer. Konu varsa normal inceler ve gerektiğinde sorar.
 
 **Sistem kararları** aynı kart düzeniyle gelir:
 
@@ -282,9 +318,144 @@ sequenceDiagram
 
 ![Teslim kararı: notla geri gönderme](docs/karar-karti.png)
 
-**Seni darlamasınlar diye:** bir aşamada en fazla `en_fazla_soru_turu` (varsayılan 2) soru turu. Hak dolunca ajanlara "VARSAYIM yaz, devam et" denir. Soruları tamamen kapatmak için `kovan.yaml`'da `ajan_sorulari: false`.
+**Seni darlamasınlar diye:** sorular önce ekipte çözülür; bir aşamada en fazla `en_fazla_soru_turu` (varsayılan 2) soru turu açılır. Hak dolunca ajanlara "VARSAYIM yaz, devam et" denir. Soruları tamamen kapatmak için `kovan.yaml`'da `ajan_sorulari: false`.
 
 **Haberin olsun diye:** bir fikir seni beklediğinde sekme başlığı "(N) Kovan" olur; üst çubuktaki **Bildirim al** ile sekme arka plandayken masaüstü bildirimi gelir.
+
+---
+
+## Derin planlama ve iş kalemleri
+
+Kod, plan onaylanmadan başlamaz. Planlama aşamaları sırayla:
+
+| Aşama | Kim | Ne üretir | Kim onaylar |
+|---|---|---|---|
+| Kapsam ve kabul paketi | PO | problem, kapsam içi/dışı, ölçülebilir kabul kriterleri (K1...) | – |
+| Analiz belgesi | ANLZ | kurallar, uç durumlar, hata davranışı | PO (kapsam), TKM (uygulanabilirlik), KTST (uç durum ve kalite), UYUM (konu varsa) |
+| UX tasarım (tam yığın) | UX | akışlar, tıklanabilir prototip, arayüz sözleşmesi | PO, ANLZ, UYUM (konu varsa) |
+| Teknik plan | TKM | dosyalar, imzalar, kararlar, uygulama sırası | ANLZ, SCRT, UYUM (konu varsa) |
+| Teslim planı | PJY | sıralı iş kalemleri ve bağımlılıklar, `kovan-plan` bloğu | sistem (plan biçimi), PO, TKM |
+| Test senaryoları | KTST | her kaleme bağlı TS-ID'ler | PO, ANLZ |
+| Test altyapısı | OTOM | test projesi ve `test-be.sh`/`test-fe.sh` (kilitlenir) | test koşumu, KTST |
+
+Teslim planı onaylanınca **İş kalemleri** aşaması açılır: plandaki her kalem için, bağımlılık sırasıyla iki aşama oluşur.
+
+| Kalem aşaması | Kim | Doğrulama |
+|---|---|---|
+| **P1 Kabul testi** | OTOM, yalnızca `testler/<taraf>/p1/` | Senaryo incelemesi (ANLZ), Kapsama (KTST); sonra kilitlenir |
+| **P1 İş kalemi** | kalemin yazılımcısı (BE ya da FE, hibritte yerel Qwen) | Testler (bütün kalemlerin testleri birlikte: regresyon), Uygunluk (ANLZ), Kod incelemesi (TKM), Test incelemesi (KTST: testlere özel hile var mı), Güvenlik (SCRT), FE kaleminde UX |
+
+Ardından **Birleştirme** (uçtan uca senaryolar ve bütün testler), **Teslim paketi** (PJY), **Kabul** (sen) ve **Gelişim önerileri** gelir. Arayüzde her kalemin hücreleri bir çerçevede durur; altında "İş kalemleri" tablosu (kalem, kapsam, yazılımcı, bağımlılık, kabul kriterleri, durum) ve "Sırada" satırı görünür.
+
+![İş kalemleri: her kalem kendi çerçevesinde, altında plan tablosu](docs/kalemler.png)
+
+`kovan-plan` bloğu (Proje Yöneticisi'nin belgesinin sonunda):
+
+```yaml
+- id: P1
+  baslik: Sulama tarihi hesabı
+  gelistirici: be-yazilimci
+  bagimli: []
+  kabul: [K1, K2]
+  kapsam: backend/src/sulama.ts içindeki sonrakiSulama(sonSulama, aralikGun)
+- id: P2
+  baslik: Bugün sulanacaklar listesi
+  gelistirici: be-yazilimci
+  bagimli: [P1]
+  kabul: [K3]
+  kapsam: backend/src/liste.ts içindeki bugunSulanacaklar(bitkiler, bugun)
+```
+
+Teslimde bir kaleme geri gönderirsen yalnızca o kalem yeniden çalışır, sonrakiler yeniden doğrulanır. Teslim planına geri gönderirsen kalemler yeni plandan açılır; değişmeyen kalemler yeniden yazılmaz.
+
+---
+
+## Gelişim önerileri ve yeni sürüm
+
+Kabulünden sonra Ürün Sahibi ürünü kullanıcı gözüyle değerlendirir ve 2-5 gelişim önerisi getirir (ne değişir, kullanıcı ne kazanır, efor, öncelik). Bunları ekip oylamaz; ürünün yönü senin kararın. Her öneri sana ayrı bir kart olarak gelir:
+
+- **Evet, sonraki sürüme al**
+- **Değiştirerek al**: notuna yazdığın biçimde alınır
+- **Şimdilik hayır**: defterde kalır; PO yeni bir gerekçe olmadan yeniden getirmez
+- **Hayır, bir daha önerme**
+
+Kararların **gelişim defterine** (`belgeler/gelisim-defteri.md`) yazılır. Kabul ettiklerin varsa fikrin sayfasında yeni sürümün metni hazır gelir; düzenleyip **2. sürümü başlat** dersin. Yeni sürüm önceki sürümün kodunu, kararlarını ve gelişim defterini devralır, aynı derin akıştan geçer; kalemleri eski testlerle çakışmasın diye `v2-p1` gibi adlanır, eski testler regresyon olarak koşmaya devam eder. Kartları o an değerlendirmek istemezsen "Şimdi değerlendirmeyeceğim" ile geçebilirsin.
+
+![Gelişim önerileri: her biri için "olmalı mı?"](docs/gelisim-kartlari.png)
+
+---
+
+## Replatform: mevcut sistemi yeniden yazmak
+
+Var olan bir sistemi (PL/SQL, COBOL, Java, C...) analiz dokümanıyla birlikte verirsin; Kovan onu temiz bir mimariyle ve testli olarak yeniden yazar. Çıktı, kendi sistemine entegre edeceğin koddur: hesaplama saf domain katmanında, dış dünya (veritabanı, muhasebe, parametreler, zamanlayıcı) port olarak durur, adaptörleri sen yazarsın. Yanında entegrasyon kılavuzu ve paralel koşum planı gelir.
+
+![Doküman ile kod farkı: ekip bölündü, karar sende](docs/replatform-soru.png)
+
+### Kaynakları vermek
+Yeni fikirde **Replatform** akışını seç; **Mevcut sistem** alanına bu makinedeki klasör, `.zip` ya da dosya yollarını satır satır yaz. Kovan:
+- kopyasını fikrin `kod/kaynak/` klasörüne alır, aslına dokunmaz; kopyayı **kilitler** (SHA-256). Ajanlar yalnızca okur; değiştiren olursa sistem geri alır ve sınır ihlali yazar;
+- `.git`, `node_modules`, `target`, `build` gibi klasörleri ve ikili dosyaları (`.jar`, `.class`, `.dmp`...) almaz;
+- Word belgelerini (`.docx`) tablolarıyla HTML'e çevirir; her paragraf ve tablo satırı ayrı satırdadır, belgeye de satır atfı verilebilir. Eski `.doc` ve `.xls` okunamaz, envantere not düşer;
+- Windows-1254 (Türkçe) ve UTF-16 dosyaları UTF-8'e çevirir; satırlar değişmez, atıflar geçerli kalır;
+- dökümünü **Kaynak envanteri** belgesine yazar. Sınır: 5.000 dosya, toplam 200 MB, dosya başına 20 MB.
+
+![Yeni fikir: mevcut sistem, hedef yığın ve gizlilik notu](docs/replatform-yeni.png)
+
+### Akış
+| Aşama | Kim | Ne üretir | Kim onaylar |
+|---|---|---|---|
+| Mevcut sistemi anlama | MSA, salt okunur | giriş noktaları, akış, veri modeli, iş kuralları (E1...), doküman ile kod farkları (FARK), şüpheli davranışlar (ŞÜPHE); her kural `kaynak/<dosya>:<satır>` atfıyla | sistem (atıflar), ANLZ, TKM, KTST |
+| Kapsam ve kabul paketi | PO | neler taşınıyor, neler dışarıda; kabul kriterleri, biri mutlaka eşdeğerlik | – |
+| Hedef analiz | ANLZ | her eski kural için AYNEN KORU, DEĞİŞTİR ya da BIRAK; yeni kurallar (K1...) eski kurallarla eşli | PO, **MSA (eşdeğerlik)**, TKM, KTST, UYUM (konu varsa) |
+| Teknik plan | TKM | domain, uygulama katmanı, portlar; eski tabloların portlara eşlenmesi | ANLZ, MSA, SCRT, UYUM |
+| Teslim planı | PJY | önce saf hesap, sonra akış ve portlar | sistem (plan biçimi), PO, TKM |
+| Test senaryoları, test altyapısı | KTST, OTOM | eski kurala bağlı senaryolar, altın testler; hedef yığına göre test projesi | ANLZ, MSA, KTST |
+| Her kalem | OTOM, sonra BCKD | kilitli kabul testi, sonra kod | ANLZ, MSA, TKM, KTST, SCRT |
+| Birleştirme | OTOM | eski sistemin örnek girdisiyle tam bir gün sonu, çıktı eskisiyle karşılaştırılır | TKM |
+| Entegrasyon kılavuzu | TKM | modüller, yazacağın adaptörler, yapılandırma, paralel koşum, geçiş ve geri dönüş | ANLZ, MSA |
+| Teslim, kabul, gelişim | PJY, sen, PO | teslim paketi (eski kuralların durumu dahil), senin onayın, gelişim önerileri | PO |
+
+### Neyi farklı yapıyor
+- **Uydurma atıf geri döner.** Mevcut sistem analizindeki her atfı sistem denetler: dosya var mı, o satırlar var mı. Atıfsız ya da uydurma atıflı analiz onay kuruluna gitmeden düzeltmeye döner. Belgelerdeki atıflar tıklanır: eski sistemin o satırları **Mevcut sistem** sekmesinde vurgulanarak açılır, iddiayı kodla yan yana doğrularsın.
+- **Farklar karara bağlanır.** Doküman gün esasını 360, kod 365 diyorsa bu bir FARK'tır. Hedef analizde hangisinin geçerli olduğunu ekip oylar; anlaşamazsa soru oylarla sana gelir. Üretimdeki davranışı değiştiren her karar karar defterinde kalır.
+- **Eşdeğerlik ayrı bir onay.** MSA, hedef analizden koda kadar her aşamada "korunan kural eskisiyle aynı mı davranıyor?" diye bakar: yuvarlama, gün sayımı, sıralama, boş ve negatif durumlar.
+- **Altın test.** `kaynak/` altında eski sistemin örnek girdisi ve çıktısı varsa (ör. `girdi.csv`, `beklenen.csv`), birleştirme yeni kodu onunla koşar ve sonucu satır satır karşılaştırır. Anonimleştirilmiş birkaç günlük örnek koyman en güçlü güvencedir.
+
+![Analizdeki atfa tıklayınca eski sistemin satırları açılır](docs/replatform-atif.png)
+
+### Hedef yığın
+Yeni fikirde seçersen karar defterine yazılır ve bütün ajanlar ona uyar. Seçmezsen mimar önerir.
+
+| Seçenek | Ne zaman |
+|---|---|
+| Java 21 + Spring Boot (Maven) | yaygın LTS; para ve oran BigDecimal, iş mantığı saf domain'de (hexagonal) |
+| Java 25 + Spring Boot (Maven) | yeni LTS'e geçtiysen |
+| Java 21 + Spring Boot + Temporal | iş uzun, çok adımlı ve kesintide kaldığı yerden sürmesi gerekiyorsa |
+| Node.js + TypeScript | Kovan'ın varsayılanı |
+| Başka bir yığın | serbest metin, ör. "Java 17 + Spring Boot 3, Gradle" |
+
+Java'da ajanlar Maven ya da Gradle ile derler ve test eder; ilk koşumda bağımlılıklar iner, internet ya da kurumun Maven deposu gerekir.
+
+**Temporal ne zaman gerekir?** Temporal, uzun süren ve adım adım ilerleyen işlerin (gün sonu gibi) kesintide kaldığı yerden sürmesini, yeniden denemeyi ve zaman aşımını altyapıya bırakır. Hesaplamanın kendisini değil, akışın dayanıklılığını çözer. Bu yüzden bir hedef yığın seçeneği olarak duruyor: hesap yine saf Java'da kalır, Temporal yalnızca akışı yönetir. Kurumunda Temporal kümesi yoksa düz Spring Boot ve idempotent adımlarla başlamak daha az iş çıkarır.
+
+### Gizlilik: hangi modda ne makineden çıkar
+| Mod | Kaynak kod ve belgeler | Not |
+|---|---|---|
+| Deneme | hiçbir yere gitmez | gerçek ajan çalışmaz; akışı görmek için |
+| **Hepsi yerel** | bu makinede kalır | bütün ajanlar (analiz, onay, oy dahil) yerel modelde; yerel motor yoksa iş durur, buluta düşülmez |
+| Hibrit | analiz ve onay ajanları üzerinden Claude'a gider | kodu yerel model yazar |
+| Hepsi Claude | Claude'a gider | |
+
+Kurum içi bir sistemse önce kurumunun politikasına bak. Buluta gitmemesi gerekiyorsa Hepsi yerel'i kullan ya da adları ve verileri anonimleştirilmiş bir kopyayla çalış. Hepsi yerel daha yavaştır ve yerel model analizde Claude kadar güçlü değildir; daha çok düzeltme turu ve daha çok soru bekle.
+
+### Örnekle dene
+`ornekler/reeskont-eski/` kurgusal bir eski sistemdir: kart reeskont gün sonu PL/SQL paketi, Word analiz dokümanı ve örnek veri. Bilerek iki iz taşır: doküman gün esasını 360 diyor, kod 365 kullanıyor; aynı tarih iki kez çalışırsa çift kayıt oluşur. **Yeni fikir → Örnekle doldur: Kart reeskont gün sonu → Mod: Deneme** ile dene. Mevcut Sistem Analisti farkı satır atfıyla bulur, analist "Gün esası" sorusunu sorar, ekip bölünür ve soru sana gelir; sonunda yeni kod eski sistemin örnek çıktısıyla karşılaştırılır. Deneme motoru gerçek Java yazmaz, seçtiğin yığından bağımsız küçük bir JavaScript örneği üretir.
+
+**Kendi sistemin için:**
+- Tek bir işle başla: bir gün sonu paketi, çağırdığı yardımcılar ve onun analiz dokümanı. Bütün şemayı verme.
+- Tablo tanımlarını (DDL) ve parametre tablolarından örnekleri ekle; veri modeli oradan çıkar.
+- Eski sistemin bir günlük girdi ve çıktısını, anonimleştirerek, CSV olarak koy: altın test onu kullanır.
+- `.doc` belgeyi `.docx` olarak kaydet.
 
 ---
 
@@ -294,8 +465,8 @@ sequenceDiagram
 2. `Baslat.command`'a çift tıkla. İlk seferde npm paketlerini kurar ve arayüzü derler (~1 dk); sonra tarayıcıda `http://127.0.0.1:8765` açılır.
    - macOS "doğrulanamadı" derse: **Sistem Ayarları → Gizlilik ve Güvenlik → Yine de Aç**. Ya da Terminal'de: `cd ~/Projeler/kovan && bash Baslat.command`
 3. **Yeni fikir** → "Örnekle doldur: Flora AI bakım paneli" → Akış **Tam yığın** → Mod **Deneme** → **Fikri başlat**. Token harcamadan bütün ekibi, soruları ve kararları görürsün.
-   Küçük bir iş denemek için "Flora AI analiz kredisi" (Mini akış).
-4. Gerçek iş için mod: **Hibrit** (Ollama kuruluysa) ya da **Hepsi Claude**.
+   Küçük bir iş denemek için "Flora AI analiz kredisi" (Mini akış), replatformu denemek için "Kart reeskont gün sonu" (Replatform akışı).
+4. Gerçek iş için mod: **Hibrit** (Ollama kuruluysa), **Hepsi Claude** ya da kod makineden çıkmamalıysa **Hepsi yerel**.
 
 **Gereksinimler:** macOS, **Node.js 20.19+ ya da 22.12+** (LTS önerilir), Claude Code (kurulu ve giriş yapılmış: Terminal'de bir kez `claude`). Hibrit için ayrıca Ollama 0.14+.
 
@@ -305,17 +476,27 @@ Terminal'den: `npm install`, `npm run build`, `npm start` (deneme modu varsayıl
 
 ## Hibrit için yerel Qwen kurulumu
 
+**Tek tık:** `Ollama-Kur.command`'a çift tıkla. Betik:
+
+1. macOS sürümünü (14+), işlemciyi ve belleği kontrol eder,
+2. Ollama yoksa resmî uygulamayı indirip Uygulamalar'a kurar,
+3. bağlam uzunluğunu **64k** yapar (`launchctl setenv OLLAMA_CONTEXT_LENGTH`, yeniden başlatmalardan sonra da geçerli) ve Ollama'yı yeniden başlatır,
+4. belleğine uygun modeli indirir ve `kovan.yaml`'daki model satırını günceller,
+5. Kovan'ın kullandığı yolu (Anthropic uyumlu `/v1/messages`) gerçek bir istekle dener ve yüklü modelin bağlamını gösterir.
+
+Tekrar çalıştırmak güvenlidir; kurulu olanı yeniden kurmaz. Model seçimini ezmek için Terminal'de: `KOVAN_MODEL=qwen3-coder:30b ./Ollama-Kur.command`.
+
+**Elle kurulum:**
 1. [Ollama](https://ollama.com) uygulamasını kur. **0.14 veya üstü** olmalı; Claude Code ile konuşabilmesi bu sürümden geliyor.
-2. Ollama **Ayarlar → Context length** değerini **64k** yap. Bu en kritik ayar: bağlam küçük kalırsa ajan saçmalar.
-   Terminal'den çalıştırıyorsan: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
+2. Ollama **Settings → Context length** değerini **64k** yap. Bu en kritik ayar: bağlam küçük kalırsa ajan saçmalar. Ortam değişkeniyle: `launchctl setenv OLLAMA_CONTEXT_LENGTH 65536`, sonra Ollama'yı yeniden başlat. Terminal'den çalıştırıyorsan: `OLLAMA_CONTEXT_LENGTH=65536 ollama serve`
 3. Modeli indir: `ollama pull qwen3-coder:30b`
 4. Kovan'ı yeniden başlat. Üst çubukta **Yerel: hazır** görmelisin.
 
 | Mac belleği | Model (`kovan.yaml` → `motorlar.qwen-yerel.model`) |
 |---|---|
-| 32 GB | `qwen3-coder:30b` (MoE, hızlı; varsayılan) ya da `qwen3.6:27b` (daha yeni, daha yavaş) |
-| 64 GB+ | `qwen3-coder-next` |
-| 16 GB | Yerel ajan kodlaması zayıf kalır. **Hepsi Claude** modunu öneririm. |
+| 32 GB ve üstü | `qwen3-coder:30b` (MoE, hızlı; varsayılan) |
+| 16-24 GB | `qwen3.5:9b` (küçük; basit kalemlerde iş görür, zor kalemde "Claude'a devret") |
+| 16 GB altı | Yerel ajan kodlaması zayıf kalır. **Hepsi Claude** modunu öneririm. |
 
 Ollama değişkenlerini (`ANTHROPIC_BASE_URL` vb.) `~/.zshrc`'ye ya da `~/.claude/settings.json`'a yazma. Kovan bunları yalnızca yerel ajanların çağrısına koyar, Claude ajanları için temizler. `settings.json`'daki değerler ise Kovan'ın ayarını ezer.
 
@@ -323,47 +504,39 @@ Ollama değişkenlerini (`ANTHROPIC_BASE_URL` vb.) `~/.zshrc`'ye ya da `~/.claud
 
 ## Ekip ve onay kurulları
 
-| Ajan | Motor | Üretir | Onay kurullarında |
-|---|---|---|---|
-| Ürün Sahibi (PO) | Claude | brif | analiz, UX, test senaryoları, BE ve FE kodu |
-| İş Analisti (ANLZ) | Claude | analiz | UX, plan, test senaryoları |
-| UX Tasarımcı (UX) | Claude | `tasarim/`: akışlar, tıklanabilir prototip, arayüz sözleşmesi | FE kodu |
-| Ana Mimar (TKM) | Claude | teknik plan | analiz, BE ve FE kodu |
-| Test Analisti (KTST) | Claude | FE + BE test senaryoları | otomatik testler (kapsama) |
-| Test Otomasyon (OTOM) | Claude | `testler/`, `test-be.sh`, `test-fe.sh` (sonra kilitlenir) | – |
-| Yazılımcı BE (BCKD) | **Qwen (yerel)** | `backend/` | – |
-| Yazılımcı FE (FE) | **Qwen (yerel)** | `frontend/` | – |
-| Güvenlik (SCRT) | Claude | – | plan, BE ve FE kodu (yalnızca KRİTİK/YÜKSEK için DÜZELT) |
-| Mevzuat ve Uyum (UYUM) | Claude | – | analiz, UX, plan, FE kodu |
+| Ajan | Motor | Üretir | Onay kurullarında | Ortak kararda |
+|---|---|---|---|---|
+| Ürün Sahibi (PO) | Claude | kapsam ve kabul paketi, gelişim önerileri | analiz, UX, teslim planı, test senaryoları, teslim paketi | oy verir |
+| İş Analisti (ANLZ) | Claude | analiz belgesi | UX, teknik plan, test senaryoları, kabul testleri (senaryo), kod (uygunluk) | oy verir |
+| UX Tasarımcı (UX) | Claude | `tasarim/`: akışlar, tıklanabilir prototip, arayüz sözleşmesi | FE kalemleri | – |
+| Ana Mimar (TKM) | Claude | teknik plan ve uygulama sırası; replatformda entegrasyon kılavuzu | analiz, teslim planı, kod, birleştirme | oy verir |
+| Proje Yöneticisi (PJY) | Claude | teslim planı (iş kalemleri), teslim paketi | – | – |
+| Test Analisti (KTST) | Claude | kalemlere bağlı FE + BE test senaryoları | analiz (uç durum ve kalite), test altyapısı, kabul testleri, kod (test hilesi) | – |
+| Test Otomasyon (OTOM) | Claude | test altyapısı, her kalemin kabul testleri (kilitlenir), uçtan uca senaryolar | – | – |
+| Yazılımcı BE (BCKD) | **Qwen (yerel)** | `backend/` | – | – |
+| Yazılımcı FE (FE) | **Qwen (yerel)** | `frontend/` | – | – |
+| Güvenlik (SCRT) | Claude | – | teknik plan, kod (yalnızca KRİTİK/YÜKSEK için DÜZELT) | – |
+| Mevzuat ve Uyum (UYUM) | Claude | – | analiz; konu varsa UX ve teknik plan | – |
+| Mevcut Sistem Analisti (MSA) | Claude | replatformda mevcut sistem analizi (salt okunur, koda atıflı) | hedef analiz, teknik plan, test senaryoları, kabul testleri, kod ve entegrasyon kılavuzu (eşdeğerlik) | – |
 
-**Tam yığında onay kurulları:**
-
-| Aşama | Onaylayanlar |
-|---|---|
-| Analiz | PO + Mimar + Mevzuat |
-| UX tasarım | PO + Analist + Mevzuat |
-| Teknik plan | Analist + Güvenlik + Mevzuat |
-| Test senaryoları | PO + Analist |
-| Otomatik testler | Test Analisti |
-| BE geliştirme | BE testleri + Mimar + PO + Güvenlik |
-| FE geliştirme | FE testleri + Mimar + PO + UX + Güvenlik + Mevzuat |
+**Rolleri ve sınırları kim belirliyor?** Kartlar, yaygın yazılım ekibi rollerinden çıkarılmış bir başlangıç taslağıdır; kod değil, `ajanlar/*.md` dosyalarında düz metindir. Her kartta rol, görev, "Sınırların" listesi, ne zaman soru soracağı ve inceleyen olduğunda neye bakacağı yazar. Yazma alanı, araçlar ve izinli komutlar ise ön bilgide ve akış dosyasında tanımlıdır ve sistem tarafından uygulanır. Kendi ekibinin gerçek iş tanımlarıyla değiştirmen beklenir: kartı düzenle, Kovan'ı yeniden başlat.
 
 **Arayüz sözleşmesi:** UX her önemli element için sabit bir `id` belirler. Playwright testleri bu kimliklere göre yazılır, FE Yazılımcı aynılarını JSX'te kullanmak zorundadır. Yerel modelin belirsizlikte kaybolmasını azaltan şey bu.
 
-**Mevzuat ajanı hukuki görüş vermez.** Riskleri işaretler, kararı ürün sahibine (sana) bırakması gereken yerde sorar. Madde ya da numara uydurmaması kartında kural olarak yazılı; emin değilse "uzman teyidi gerekir" der.
+**Mevzuat ajanı hukuki görüş vermez.** Riskleri işaretler; fikirde mevzuat konusu yoksa bunu bir kez söyleyip çekilir. Hukuki bir riski kabul etmek gibi kararları sana bırakır. Madde ya da numara uydurmaması kartında kural olarak yazılı; emin değilse "uzman teyidi gerekir" der.
 
 ---
 
 ## Üretilen uygulamanın yığını
 
-Fikir ya da senin kararların başka bir şey söylemiyorsa ajanlar şu yığınla çalışır:
+Yeni fikirde bir **hedef yığın** seçersen (Java 21 + Spring Boot vb., bkz. [Replatform](#hedef-yığın)) ajanlar onunla çalışır. Seçmezsen ve fikir ya da kararların başka bir şey söylemiyorsa şu yığın:
 
 | Katman | Teknoloji | Klasör | Kim yazar |
 |---|---|---|---|
 | Frontend | Vite + React + TypeScript (`base: "./"`, önizleme alt yoldan açılır) | `kod/frontend/` | Yazılımcı FE |
 | Backend | Node.js 20+ + TypeScript (ESM); iş mantığı saf fonksiyonlarda | `kod/backend/` | Yazılımcı BE |
-| BE testleri | Vitest | `kod/testler/be/*.test.ts` + `test-be.sh` | Test Otomasyon (kilitli) |
-| FE testleri | Playwright (chromium, `vite preview` üzerinde) | `kod/testler/fe/*.spec.ts` + `test-fe.sh` | Test Otomasyon (kilitli) |
+| BE testleri | Vitest | `kod/testler/be/<kalem>/*.test.ts` + `test-be.sh` | Test Otomasyon (kalem kalem kilitli) |
+| FE testleri | Playwright (chromium, `vite preview` üzerinde) | `kod/testler/fe/<kalem>/*.spec.ts` + `test-fe.sh` | Test Otomasyon (kalem kalem kilitli) |
 | Tasarım | bağımlılıksız tıklanabilir HTML prototip | `kod/tasarim/` | UX (kilitli) |
 
 - Ajanlar npm'i her zaman kendi klasörleri için `--prefix` ile çalıştırır (`npm --prefix backend install`). İzinli komutlar kartlarda bu biçimde tanımlı; gerisi reddedilir.
@@ -378,6 +551,8 @@ Fikir ya da senin kararların başka bir şey söylemiyorsa ajanlar şu yığın
 - **Yeni ajan:** `ajanlar/` içinde bir kartı kopyala, düzenle, Kovan'ı yeniden başlat. Yerelde çalışsın istersen `motor: qwen-yerel` yaz. Ne zaman soru soracağını kartın "Ne zaman insana sorarsın" bölümünde anlat.
 - **Ajan başına farklı yerel model:** kartta `yerel_model: qwen3.6:27b` gibi bir satır ekle.
 - **Yeni akış:** bir YAML'ı kopyala. Aşama ekle, `dogrulama` altına inceleyen ya da komut ekle, `yazabilir` ile yazma alanını ver.
+- **Kalem adımları:** `tur: kalemler` aşamasındaki `adimlar` her kalem için tekrarlanır. Yer tutucular: `{kalem}` (P1), `{kalem_kucuk}` (p1), `{baslik}`, `{kapsam}`, `{kabul}`, `{bagimli}`, `{gelistirici}`, `{alan}` (backend), `{taraf}` (be). Bir onaycıyı yalnızca bir taraftaki kalemlerde çalıştırmak için `taraf: fe`.
+- **Atlanabilir onaycı:** `atlanabilir: true` olan onaycı, fikir için bir kez "kapsam dışı" dediyse sonraki aşamalarda çağrılmaz (Mevzuat böyle).
 - **Kural:** Yeni bir ajanı, ölçtüğün bir hata türünü yakalamak için ekle. Her yeni devir bağlam kaybı, süre ve maliyet getirir.
 
 ---
@@ -405,12 +580,18 @@ Testler gerçek `claude`'u çağırmaz: `sunucu/test/yardimci/sahte-claude.mjs` 
 | "Paket kurulumu başarısız" | İnternet bağlantını kontrol et; Terminal'de `npm install` çalıştırıp hatayı gör |
 | "Port 8765 kullanımda" | Kovan zaten açık olabilir; değilse `kovan.yaml`'da `port`'u değiştir |
 | "Yerel hazır değil: Ollama'ya ulaşılamadı" | Ollama uygulamasını aç |
-| "Model indirilmemiş" | `ollama pull qwen3-coder:30b` |
+| "Model indirilmemiş" | `Ollama-Kur.command`'ı yeniden çalıştır ya da `ollama pull qwen3-coder:30b` |
 | Qwen saçmalıyor ya da araçları yanlış kullanıyor | Ollama bağlam uzunluğu en az 64k mı? Değilse en sık sebep bu |
 | Qwen hep tur sınırına takılıyor | **Bu aşamayı Claude'a devret** ya da akışta `en_fazla_tur`'u artır; daha büyük model dene |
 | "claude oturumu açık değil" | Terminal'de bir kez `claude`, giriş, sonra **Tekrar dene** |
 | "Kullanım limitine takıldı" | Limit sıfırlanınca **Tekrar dene**. `paralel_fikir: 1` kalsın; küçük işlerde **Mini** kullan |
-| Ajanlar çok soru soruyor | `en_fazla_soru_turu`'nu düşür ya da `ajan_sorulari: false` yap |
+| Ajanlar çok soru soruyor | Ortak karar açık mı (`ortak_karar.acik`)? `en_fazla_soru_turu`'nu düşür ya da `ajan_sorulari: false` yap |
+| Ekip hep anlaşamıyor, sorular bana geliyor | `ortak_karar.kural: cogunluk` yap ya da kurula üye ekle (`ortak_karar.kurul`) |
+| "Teslim planı okunamadı" | Proje Yöneticisi `kovan-plan` bloğunu bozuk yazmış; "Notumla geri gönder" ile teslim planına döndür |
+| "Kaynak çok büyük" | Yalnızca taşınacak işin klasörlerini ver; sınır 5.000 dosya, toplam 200 MB |
+| "Kaynak atıfları: GEÇERSİZ" | Analist olmayan bir dosyaya ya da satıra atıf vermiş; sistem aşamayı onay kuruluna göndermeden düzeltmeye döndürür. Tekrarlıyorsa tur sınırında karar ver |
+| Hepsi yerel'de analiz zayıf, tur sınırına takılıyor | Daha büyük yerel model (32 GB+ bellekte `qwen3-coder:30b`), daha küçük kaynak (tek iş), akışta `en_fazla_tur`'u artır |
+| Java'da Maven bağımlılıkları inmiyor | İlk test koşumu bağımlılıkları indirir; kurum ağındaysan `~/.m2/settings.xml`'de kurumun deposunu tanımla |
 | FE testleri ilk seferde uzun sürüyor | `test-fe.sh` Playwright'ın chromium'unu kuruyor (bir kerelik) |
 | "İzin reddi" görüyorsun ve o komut gerçekten gerekli | Kartın `izinli_komutlar` listesine ekle |
 | Ajanın ne gördüğünü merak ediyorum | Zaman çizelgesinde adıma tıkla, ya da `calisma/F-xxx/gunluk/adim-N.json` |
@@ -423,9 +604,16 @@ Kullanım sütunu Claude Code'un tahminidir. Abonelikte faturalanmaz ama kullan�
 
 - [x] Ajanlar takıldıkları yerde seçenekli soru sorar; karar defteri
 - [x] Vite + React arayüz, Node.js + TypeScript sunucu
+- [x] Ortak karar: sorular önce ekipte oylanır
+- [x] Derin planlama: teslim planı, iş kalemleri, kalem başına kabul testi
+- [x] Gelişim önerileri, gelişim defteri ve yeni sürüm
+- [x] Tek tık Ollama kurulumu
+- [x] Replatform: mevcut sistemi koda atıflarla anlama, eşdeğerlik onayı, altın test, entegrasyon kılavuzu
+- [x] Hepsi yerel modu: kod ve belgeler makineden çıkmaz
 - [ ] Fikir başına git deposu: tur tur diff ve geri alma
 - [ ] Deterministik güvenlik taramaları onay kurulundan önce (`npm audit`, `semgrep`, `gitleaks`)
 - [ ] Qwen Code motoru: Qwen modellerini kendi harness'ında çalıştırma seçeneği
 - [ ] Fikrin boyutuna göre akışı öneren triage ajanı
 - [ ] İş kalemlerinin (P1, P2...) paralel geliştirilmesi
 - [ ] Mod karşılaştırma raporu: aynı fikir için Hibrit ve Hepsi Claude; tur, süre, maliyet
+- [ ] Paralel koşum aracı: eski ve yeni sistemin aynı günkü çıktısını otomatik karşılaştırma raporu

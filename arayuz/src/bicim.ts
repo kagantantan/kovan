@@ -42,11 +42,12 @@ export const FIKIR_DURUMU: Record<FikirDurumu, string> = {
   durduruldu: "Durduruldu",
 };
 
-export const MOD_ADI: Record<Mod, string> = { hibrit: "Hibrit", claude: "Hepsi Claude", deneme: "Deneme" };
+export const MOD_ADI: Record<Mod, string> = { hibrit: "Hibrit", claude: "Hepsi Claude", yerel: "Hepsi yerel", deneme: "Deneme" };
 
 export const MOD_ACIKLAMA: Record<Mod, string> = {
   hibrit: "Kodu yerel model yazar; analiz, tasarım ve onaylar Claude'da.",
   claude: "Bütün ajanlar Claude'da. Yerel motor hazır değilse ya da kıyas için.",
+  yerel: "Bütün ajanlar yerel modelde; kod ve belgeler bu makineden çıkmaz. Kurum içi kod için. Daha yavaş, daha fazla düzeltme turu.",
   deneme: "Gerçek ajan çalışmaz, token harcanmaz. Akışı ve soruları görmek için.",
 };
 
@@ -92,6 +93,10 @@ export function adimDurumu(a: Adim): { ad: string; ton: Ton } {
     case "durduruldu": return { ad: "durduruldu", ton: "sessiz" };
     case "kesildi": return { ad: "yarıda kaldı", ton: "kotu" };
     case "yeniden": return { ad: "yeniden doğrulama", ton: "sessiz" };
+    case "oy": return { ad: "oy verdi", ton: "sessiz" };
+    case "insana": return { ad: "sana bıraktı", ton: "dikkat" };
+    case "ekip": return { ad: "ekip karar verdi", ton: "iyi" };
+    case "kapsam": return { ad: "kapsam dışı", ton: "sessiz" };
     default: return { ad: d, ton: "sessiz" };
   }
 }

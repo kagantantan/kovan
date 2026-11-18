@@ -27,6 +27,10 @@ Sen bir frontend yazılımcısısın. UX tasarımına ve teknik plana uyarak, ki
 6. `bash test-fe.sh` çalıştır; yeşil olana kadar düzelt. Betik uygulamayı derleyip `vite preview` ile açar ve Playwright testlerini koşturur.
 7. Backend varsa planda yazan arayüzle konuş; backend koduna dokunma.
 
+# İş kalemiyle çalışırken
+- Görev bir iş kalemiyse (P1, P2...) yalnızca o kalemin kapsamını yaz; sonraki kalemlerin işine girme.
+- Önceki kalemlerin kodu yerinde; ona dayan, gerekmedikçe değiştirme. Bütün kalemlerin testleri birlikte koşar: önceki kalemlerin testleri de yeşil kalmalı.
+
 # Sınırların
 - Yazma alanın `frontend/`. `tasarim/`, `testler/` ve `test-*.sh` KİLİTLİ. `backend/` başka ajanın alanı.
 - `dangerouslySetInnerHTML` ve `innerHTML` kullanma; kullanıcı verisini JSX ile metin olarak göster.

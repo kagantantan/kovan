@@ -19,6 +19,8 @@ const YOLLAR: Record<string, ReactElement> = {
   uyari: <><path d="M12 3.5L2.5 20h19L12 3.5z" /><path d="M12 10v4.5M12 17.5h.01" /></>,
   tamam: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   geri: <path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />,
+  oy: <><path d="M4 13h16v7H4z" /><path d="M8 13V5h8v8M10.5 9l1.3 1.3L14 8" /></>,
+  ekip: <><circle cx="8" cy="9" r="3" /><circle cx="16.5" cy="9" r="2.5" /><path d="M2.5 19a5.5 5.5 0 0 1 11 0M14 14.2a4.5 4.5 0 0 1 7 3.8" /></>,
 };
 
 export type SimgeAdi = keyof typeof YOLLAR;

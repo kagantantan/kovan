@@ -4,8 +4,8 @@ import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { akisOzeti, akislariYukle } from "./akislar.js";
-import { ayarlariYukle, type Ayarlar } from "./ayarlar.js";
+import { akisOzeti, akislariYukle, tumAdimlar } from "./akislar.js";
+import { HEDEF_YIGINLAR, ayarlariYukle, type Ayarlar } from "./ayarlar.js";
 import { Depo } from "./depo.js";
 import { kartOzeti, kartlariYukle } from "./kartlar.js";
 import { ClaudeMotoru, DenemeMotoru, OllamaMotoru, type Motor } from "./motor.js";
@@ -105,6 +105,13 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     return {
       surum, varsayilan_motor: cfg.motor, calisma, paralel_fikir: cfg.paralel_fikir, paralel_inceleme: cfg.paralel_inceleme,
       ajan_sorulari: cfg.ajan_sorulari, en_fazla_soru_turu: cfg.en_fazla_soru_turu, motorlar: durumlar,
+      hedef_yiginlar: HEDEF_YIGINLAR,
+      ornek_kaynak: fs.existsSync(path.join(kok, "ornekler", "reeskont-eski")) ? path.join(kok, "ornekler", "reeskont-eski") : null,
+      yerel_motor: [...motorlar.values()].find((m) => m.yerel && m.ad !== "deneme")?.ad ?? null,
+      ortak_karar: {
+        acik: cfg.ortak_karar.acik, kural: cfg.ortak_karar.kural,
+        kurul: cfg.ortak_karar.kurul.map((id) => ({ id, ad: kartlar.get(id)?.ad ?? id, kisa: kartlar.get(id)?.kisaltma ?? id })),
+      },
     };
   });
 
@@ -114,18 +121,26 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
       ...kartOzeti(k),
       motor_modeli: m ? m.modelSec(k) : k.model,
       motor_yerel: Boolean(m?.yerel),
-      uretir: [...akislar.values()].flatMap((ak) => ak.asamalar.filter((a) => a.ajan === k.id).map((a) => `${a.ad} (${ak.ad})`)),
-      onaylar: [...akislar.values()].flatMap((ak) => ak.asamalar.filter((a) => a.dogrulama.some((v) => v.inceleyen === k.id)).map((a) => `${a.ad} (${ak.ad})`)),
+      uretir: [...akislar.values()].flatMap((ak) => tumAdimlar(ak)
+        .filter((a) => a.ajan === k.id || (a.ajan === "{gelistirici}" && ak.asamalar.some((s) => k.id in s.gelistiriciler)))
+        .map((a) => `${a.ad} (${ak.ad})`)),
+      onaylar: [...akislar.values()].flatMap((ak) => tumAdimlar(ak).filter((a) => a.dogrulama.some((v) => v.inceleyen === k.id)).map((a) => `${a.ad} (${ak.ad})`)),
     };
   }));
 
-  app.get("/api/akislar", async () => [...akislar.values()].map((a) => akisOzeti(a, kartlar)));
+  // Var olan sistemle başlayan akışlar (replatform) sonda: sıfırdan ürün akışları birbirinin kısası, uzunu
+  app.get("/api/akislar", async () => [...akislar.values()]
+    .sort((a, b) => Number(a.kaynak === "zorunlu") - Number(b.kaynak === "zorunlu"))
+    .map((a) => akisOzeti(a, kartlar)));
 
   app.get("/api/fikirler", async () => ork.fikirListesi());
 
   app.post("/api/fikirler", async (req) => {
     const b = govde(req.body);
-    const fid = await ork.yeniFikir(metin(b.baslik), metin(b.metin), metin(b.profil), metin(b.motor) || cfg.motor);
+    // kaynaklar: liste ya da satır satır yollar (replatform: mevcut sistemin klasörleri)
+    const kaynaklar = Array.isArray(b.kaynaklar) ? b.kaynaklar.map(String) : metin(b.kaynaklar).split("\n");
+    const fid = await ork.yeniFikir(metin(b.baslik), metin(b.metin), metin(b.profil), metin(b.motor) || cfg.motor,
+      { kaynaklar, hedef_yigin: metin(b.hedef_yigin) });
     return { id: fid };
   });
 
@@ -151,6 +166,11 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     });
     ork.cevapla(req.params.fid, cevaplar);
     return { ok: true };
+  });
+
+  app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/surum", async (req) => {
+    const b = govde(req.body);
+    return { id: await ork.yeniSurum(req.params.fid, metin(b.metin)) };
   });
 
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/durdur", async (req) => { ork.durdur(req.params.fid); return { ok: true }; });

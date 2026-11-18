@@ -60,6 +60,45 @@ export class SahteMotor implements Motor {
   }
 }
 
+/** Betikli motor: betik bir sonuç döndürürse onu kullanır, null dönerse deneme motorunun davranışına bırakır. */
+export class BetikMotor extends SahteMotor {
+  constructor(ad: string, private betik: (c: AjanCagrisi) => Partial<AjanSonucu> | null, yerel = false) {
+    super(ad, yerel);
+  }
+
+  override async calistir(c: AjanCagrisi): Promise<AjanSonucu> {
+    const r = this.betik(c);
+    if (!r) return super.calistir(c);
+    this.cagrilar.push(c);
+    return sonuc({ ok: true, ...r });
+  }
+}
+
+/** Kısa bir oy cevabı: her soru için seçenek numarası. */
+export const oyCevabi = (...secimler: (number | "insan")[]) => ({
+  yapisal: { oylar: secimler.map((s, i) => ({ soru: i + 1, secim: s === "insan" ? [] : [s], insana_birak: s === "insan", gerekce: "betik" })) },
+  metin: "",
+});
+
+/** Üretici ajanın kovan-soru bloğu. */
+export const soruBlogu = (sorular: object[]) => ({ metin: "```kovan-soru\n" + JSON.stringify({ sorular }) + "\n```" });
+
+export const KISA_BRIF = `ad: Kısa brif
+aciklama: Test için brif ve kabul.
+fikir_butcesi_usd: 5
+asamalar:
+  - id: brif
+    ad: Brif
+    ajan: urun-sahibi
+    gorev: Brif yaz.
+    girdiler: [fikir]
+    cikti: brif
+  - id: kabul
+    ad: Kabul
+    tur: insan
+    soru: Tamam mı?
+`;
+
 export interface TestKovani extends Kovan {
   kok: string;
 }

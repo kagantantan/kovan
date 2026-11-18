@@ -35,6 +35,8 @@ function simgesi(a: Adim): SimgeAdi {
   if (a.tip === "uret") return "kalem";
   if (a.tip === "inceleme") return "buyutec";
   if (a.tip === "kontrol") return "tup";
+  if (a.tip === "oy") return "oy";
+  if (a.durum === "ekip") return "ekip";
   if (a.durum === "kilit") return "kilit";
   if (a.durum === "ihlal" || a.durum === "uyari") return "uyari";
   if (a.ajan_ad === "Ajan sorusu") return "soru";

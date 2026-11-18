@@ -1,7 +1,8 @@
 // HTTP katmanı: host ve köken denetimi, hata kodları, dosya erişim sınırları, önizleme yalıtımı,
 // karar ve cevap uç noktaları; karar ve cevap doğrulamaları.
 import { describe, expect, it } from "vitest";
-import { bekle, bekliyor, kovanOlustur, ORNEK_MINI } from "./yardimci/ortam.js";
+import path from "node:path";
+import { KOK, bekle, bekliyor, kovanOlustur, ORNEK_MINI } from "./yardimci/ortam.js";
 
 const HOST = { host: "127.0.0.1:8765" };
 
@@ -83,6 +84,40 @@ describe("HTTP sunucusu", () => {
     await bekle(k, fid, (f) => f.durum === "tamamlandi");
     const liste = (await k.app.inject({ url: "/api/fikirler", headers: HOST })).json();
     expect(liste[0]).toMatchObject({ id: fid, durum: "tamamlandi", akis_ad: "Mini" });
+  });
+});
+
+describe("Replatform uç noktaları", () => {
+  it("kaynakları satır satır alır; örnek kaynağı ve hedef yığınları bildirir; kaynak dosyaları okunur", async () => {
+    const k = await kovanOlustur();
+    const post = (payload: object) => k.app.inject({ method: "POST", url: "/api/fikirler", headers: HOST, payload });
+    const durum = (await k.app.inject({ url: "/api/durum", headers: HOST })).json();
+    expect(durum.hedef_yiginlar.map((h: { id: string }) => h.id)).toEqual(["node-ts", "java21-spring-maven", "java25-spring-maven", "java21-temporal"]);
+    expect(durum.yerel_motor).toBe("qwen-yerel");
+    expect(durum.ornek_kaynak).toBeNull();                        // geçici kökte ornekler/ yok
+    const akislar = (await k.app.inject({ url: "/api/akislar", headers: HOST })).json();
+    expect(akislar.map((a: { id: string }) => a.id).at(-1)).toBe("replatform");
+    const ilkAsama = akislar.at(-1).asamalar[0];
+    expect([ilkAsama.salt_okunur, ilkAsama.dogrulama.map((d: { tip: string }) => d.tip)]).toEqual([true, ["atif", "ajan", "ajan", "ajan"]]);
+
+    const ornek = path.join(KOK, "ornekler", "reeskont-eski");
+    const yanlis = await post({ metin: ORNEK_MINI, profil: "mini", motor: "deneme", kaynaklar: ornek });
+    expect(yanlis.statusCode).toBe(400);
+    expect(yanlis.json().detail).toMatch(/mevcut sistem kaynağı almaz/);
+    const r = await post({ metin: "Kart reeskont gün sonunu yeniden yaz.", profil: "replatform", motor: "deneme",
+      kaynaklar: `\n${ornek}\n  \n`, hedef_yigin: "java21-spring-maven" });
+    expect(r.statusCode).toBe(200);
+    const fid = r.json().id;
+    const detay = (await k.app.inject({ url: `/api/fikirler/${fid}`, headers: HOST })).json();
+    expect(detay.fikir.kaynak.yollar).toEqual([ornek]);
+    expect(detay.kararlar[0].cevap).toMatch(/^Java 21 \+ Spring Boot \(Maven\)/);
+    const pkb = await k.app.inject({ url: `/api/fikirler/${fid}/dosya?yol=kod/kaynak/reeskont-eski/KART_REESKONT_GUNSONU.pkb`, headers: HOST });
+    expect(pkb.json().icerik).toContain("c_gun_esasi    CONSTANT NUMBER       := 365;");
+    const docx = await k.app.inject({ url: `/api/fikirler/${fid}/dosya?yol=kod/kaynak/reeskont-eski/analiz.docx`, headers: HOST });
+    expect(docx.json().icerik).toBe("(ikili dosya, gösterilemiyor)");
+    const onizleme = await k.app.inject({ url: `/onizle/${fid}/kod/kaynak/reeskont-eski/analiz.docx.html`, headers: HOST });
+    expect(onizleme.headers["content-security-policy"]).toMatch(/^sandbox/);
+    await k.ork.kapat();
   });
 });
 

@@ -5,6 +5,8 @@ port: 8765
 # Yeni fikirde varsayılan mod:
 #   hibrit  -> her ajan kartındaki motoru kullanır (kod: yerel Qwen, analiz ve onay: Claude)
 #   claude  -> hepsi Claude (yerel motor hazır değilse ya da kıyas için)
+#   yerel   -> hepsi yerel motorda (aşağıdaki qwen-yerel): kod ve belgeler bu makineden çıkmaz.
+#              Kurum içi kodu replatform ederken. Daha yavaş, daha çok düzeltme turu.
 #   deneme  -> token harcamaz, akışı gösterir
 motor: hibrit
 
@@ -17,13 +19,14 @@ claude_yolu: claude
 # (Yerel motor kendi değişkenlerini yalnızca kendi ajanları için ayarlar.)
 api_anahtarini_yoksay: true
 
-# Yerel motorlar. Ajan kartında `motor: qwen-yerel` diyen ajanlar bunu kullanır.
-# Kurulum: Ollama uygulaması (0.14+), Ayarlar > bağlam uzunluğu 64k, sonra Terminal'de: ollama pull <model>
+# Yerel motorlar. Ajan kartında `motor: qwen-yerel` diyen ajanlar bunu kullanır; "Hepsi yerel" modunda
+# bütün ajanlar (analiz, onay, oylama dahil) bunu kullanır ve hiçbir çağrı Claude'a gitmez.
+# Kurulum: Ollama-Kur.command'a çift tıkla (Ollama'yı kurar, bağlamı 64k yapar, belleğine göre modeli
+# indirir ve aşağıdaki model satırını günceller). Elle kurmak için README'deki "Qwen hibrit kurulumu".
 # Model seçimi (birleşik bellek):
-#   32 GB  -> qwen3-coder:30b   (MoE, hızlı; varsayılan)
-#   32 GB  -> qwen3.6:27b       (daha yeni, daha yavaş)
-#   64 GB+ -> qwen3-coder-next  (en güçlüsü)
-#   16 GB  -> yerel ajan kodlama için zayıf kalır; 'Hepsi Claude' modunu öneririm
+#   32 GB+ -> qwen3-coder:30b   (MoE, hızlı; varsayılan)
+#   16-24 GB -> qwen3.5:9b      (küçük; basit kalemlerde iş görür)
+#   16 GB altı -> yerel kodlama zayıf kalır; 'Hepsi Claude' modunu öneririm
 motorlar:
   qwen-yerel:
     tur: ollama
@@ -47,5 +50,16 @@ deneme_gecikme_sn: 1.0
 # her zaman kendi cevabını da yazabilirsin). Cevapların karar defterine yazılır ve sonraki bütün ajanlar görür.
 ajan_sorulari: true
 
-# Bir aşamada en fazla kaç kez soru gelsin. Dolunca ajanlara "VARSAYIM yazıp devam et" denir.
+# Bir aşamada en fazla kaç soru turu açılsın (ekibin ya da senin karar verdiğin). Dolunca ajanlara
+# "VARSAYIM yazıp devam et" denir.
 en_fazla_soru_turu: 2
+
+# Ortak karar: ajan soruları önce bu kurula gider. Kurul üyeleri bağımsız oy verir; soruyu soranın önerisi
+# de bir oydur. Oybirliği çıkarsa karar ekibindir ve sana sorulmaz (karar defterine "ekip kararı" diye yazılır).
+# Anlaşamazlarsa soru oylarla birlikte sana gelir. Para, hukuki risk ve geri dönüşsüz kararları ajanlar
+# doğrudan sana sorar. Bir akışta kapatmak için akış dosyasına "ortak_karar: false" yaz (Mini'de kapalı).
+#   kural: oybirligi (hepsi aynı seçenek) ya da cogunluk (yarıdan fazlası)
+ortak_karar:
+  acik: true
+  kurul: [urun-sahibi, mimar, analist]
+  kural: oybirligi

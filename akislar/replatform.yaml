@@ -1,0 +1,286 @@
+ad: Replatform (mevcut sistemi yeniden yaz)
+aciklama: >
+  Var olan bir sistemi (analiz dokümanı ve kaynak kod) anlayıp temiz bir mimariyle yeniden yazar.
+  Önce Mevcut Sistem Analisti kodu ve dokümanı okur, sistemin gerçekte ne yaptığını kod
+  atıflarıyla çıkarır (atıfları sistem denetler); sonra kapsam, hedef analiz, mimari, teslim
+  planı ve kalem kalem kod. Her kalemde eski davranışla eşdeğerlik ayrıca denetlenir. Kod senin
+  sistemine entegre edilmek üzere üretilir; sonda entegrasyon kılavuzu ve teslim paketi gelir.
+fikir_butcesi_usd: 20
+kaynak: zorunlu            # fikir, mevcut sistemin klasörüyle başlar (kod/kaynak/, salt okunur, kilitli)
+
+asamalar:
+  - id: mevcut-sistem
+    ad: Mevcut sistemi anlama
+    ajan: mevcut-sistem-analisti
+    calisma_dizini: kod
+    salt_okunur: true
+    gorev: >
+      kaynak/ altındaki kodu ve dokümanları oku; sistemin bugün gerçekte ne yaptığını çıkar: giriş
+      noktaları, adım adım akış, veri modeli, iş kuralları (E1...), hesaplamalar, hata ve yeniden
+      çalıştırma davranışı, doküman ile kod farkları. Her kuralı kaynak/<dosya>:<satır> atfıyla koda bağla.
+    girdiler: [fikir, kaynak-envanteri]
+    cikti: mevcut-sistem
+    dogrulama:
+      - ad: Kaynak atıfları
+        atif: true               # her atıf gerçek bir dosya ve satıra gitmeli; uydurma atıf geri döner
+      - ad: İş kuralları
+        inceleyen: analist
+        odak: Kurallar eksiksiz ve anlaşılır mı? Analiz dokümanıyla kod arasındaki farklar açıkça yazılmış mı?
+      - ad: Teknik akış
+        inceleyen: mimar
+        odak: Giriş noktaları, adım sırası, veri modeli ve hata davranışı koda göre doğru mu? Atlanan bir yol var mı?
+      - ad: Hesaplama ve uç durumlar
+        inceleyen: test-analisti
+        odak: Formüller, yuvarlama, gün sayımı ve uç durumlar test yazılabilecek kesinlikte mi?
+    en_fazla_tur: 3
+
+  - id: brif
+    ad: Kapsam ve kabul paketi
+    ajan: urun-sahibi
+    gorev: >
+      Mevcut sistem analizine göre yeniden yazımın kapsamını çıkar: hangi işler taşınıyor, hangileri
+      dışarıda, kod nereye entegre edilecek, neyi projenin sahibinin sistemi sağlayacak. Ölçülebilir
+      kabul kriterleri (K1...); biri mutlaka eşdeğerlik olsun.
+    girdiler: [fikir, mevcut-sistem]
+    cikti: brif
+
+  - id: hedef-analiz
+    ad: Hedef analiz
+    ajan: analist
+    gorev: >
+      Yeni sistemin ne yapacağını yaz: her eski kural (E1...) için AYNEN KORU, DEĞİŞTİR ya da BIRAK
+      kararı ve gerekçesi; yeni kurallar (K1...) eski kurallarla eşlenmiş; uç durumlar ve hata davranışı.
+    girdiler: [fikir, brif, mevcut-sistem, kaynak-envanteri]
+    cikti: analiz
+    dogrulama:
+      - ad: Kapsam onayı
+        inceleyen: urun-sahibi
+        odak: Hedef analiz kapsamı ve kabul kriterlerini karşılıyor mu? Kapsam dışına taşan bir şey var mı?
+      - ad: Eşdeğerlik
+        inceleyen: mevcut-sistem-analisti
+        odak: Korunacak denen eski kurallar doğru ve eksiksiz aktarılmış mı? Eşlenmeyen eski kural kaldı mı?
+      - ad: Uygulanabilirlik
+        inceleyen: mimar
+        odak: Kurallar teknik olarak uygulanabilir ve test edilebilir mi? Çelişkili kural var mı?
+      - ad: Uç durum ve kalite
+        inceleyen: test-analisti
+        odak: Her kural test edilebilir mi? Uç durumlar ve beklenen sonuçlar eksiksiz ve ölçülebilir mi?
+      - ad: Mevzuat
+        inceleyen: mevzuat
+        atlanabilir: true
+        odak: Faiz, muhasebe, kişisel veri ya da raporlama açısından korunması gereken bir yükümlülük gözden kaçmış mı?
+    en_fazla_tur: 3
+
+  - id: teknik-plan
+    ad: Teknik plan
+    ajan: mimar
+    gorev: >
+      Hedef analizi, alınan kararlardaki hedef yığınla temiz bir mimariye çevir: saf domain (hesaplama),
+      uygulama katmanı, dış dünyaya portlar (veritabanı, muhasebe, zamanlayıcı, parametreler). Her eski
+      kuralın yeni yapıda nerede karşılandığını ve eski tabloların portlara nasıl eşleneceğini yaz.
+    girdiler: [brif, analiz, mevcut-sistem]
+    cikti: teknik-plan
+    dogrulama:
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Plan hedef analizdeki bütün kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?
+      - ad: Eşdeğerlik
+        inceleyen: mevcut-sistem-analisti
+        odak: Korunacak her eski kuralın yeni yapıda bir karşılığı var mı? Eski davranışı değiştirecek bir tasarım kararı var mı?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: Girdi doğrulama, gizli bilgi, loglanan veri ve yetki kararları yeterli mi?
+      - ad: Mevzuat
+        inceleyen: mevzuat
+        atlanabilir: true
+        odak: Saklama, loglama, denetim izi ve raporlama kararları uyum açısından sorun yaratıyor mu?
+    en_fazla_tur: 2
+
+  - id: teslim-plani
+    ad: Teslim planı
+    ajan: proje-yoneticisi
+    gorev: >
+      Hedef analizi ve teknik planı 2-6 sıralı iş kalemine böl (P1, P2...). Yazılımcı be-yazilimci.
+      Önce saf hesaplama, sonra onu kullanan akış ve portlar. Belgenin sonuna kovan-plan bloğunu ekle.
+    girdiler: [brif, analiz, teknik-plan]
+    cikti: teslim-plani
+    dogrulama:
+      - ad: Plan biçimi
+        plan: true
+      - ad: Kapsam onayı
+        inceleyen: urun-sahibi
+        odak: Her kabul kriteri bir kaleme düşüyor mu? Kapsam dışı kalem var mı?
+      - ad: Teknik sıra
+        inceleyen: mimar
+        odak: Kalemler teknik plana bağlı mı, bağımlılıklar doğru mu, her kalem tek başına test edilebilir mi?
+    en_fazla_tur: 2
+
+  - id: test-senaryolari
+    ad: Test senaryoları
+    ajan: test-analisti
+    gorev: >
+      Kabul kriterleri ve uç durumlar için test senaryolarını çıkar; her senaryoyu bir kaleme (P1...)
+      ve karşıladığı eski kurala (E1...) bağla. kaynak/ altında eski sistemin örnek girdi ve çıktısı
+      varsa altın test senaryolarını onlardan kur.
+    girdiler: [brif, analiz, teknik-plan, teslim-plani, mevcut-sistem]
+    cikti: test-senaryolari
+    dogrulama:
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Her kural ve uç durum için senaryo var mı, beklenen sonuçlar hedef analizle uyumlu mu?
+      - ad: Eşdeğerlik
+        inceleyen: mevcut-sistem-analisti
+        odak: Korunan her eski kural en az bir senaryoyla sınanıyor mu? Beklenen sonuçlar eski davranışla aynı mı?
+    en_fazla_tur: 2
+
+  - id: test-altyapisi
+    ad: Test altyapısı
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: >
+      Hedef yığına göre test altyapısını kur (Java'da kök pom.xml ve testler/pom.xml; Node'da
+      testler/package.json) ve test-be.sh'ı yaz. Betik testler/be/ altındaki bütün kalem klasörlerini
+      koşsun; henüz test yoksa yeşil dönsün. Kalem testlerini bu aşamada yazma.
+    girdiler: [teknik-plan, teslim-plani, test-senaryolari]
+    cikti: test-altyapisi
+    yazabilir: [testler, test-be.sh, pom.xml, settings.gradle.kts, build.gradle.kts]
+    kilitle: [test-be.sh, testler/package.json, testler/pom.xml, pom.xml]
+    dogrulama:
+      - ad: Altyapı çalışıyor
+        komut: bash test-be.sh
+        sure_dk: 15            # ilk çalıştırmada Maven ya da npm bağımlılıkları iner
+      - ad: Altyapı onayı
+        inceleyen: test-analisti
+        odak: Betik bütün kalem klasörlerini koşacak mı? Test atlanırsa ya da hiç test koşmazsa kırmızı dönüyor mu?
+    en_fazla_tur: 2
+
+  - id: kalemler
+    ad: İş kalemleri
+    tur: kalemler
+    plan: teslim-plani
+    geri_donus: teslim-plani
+    gelistiriciler:
+      be-yazilimci: { alan: backend, taraf: be }
+    adimlar:
+      - id: kabul-testi
+        ad: Kabul testi
+        ajan: test-otomasyon
+        calisma_dizini: kod
+        gorev: >
+          {kalem} ({baslik}) için kabul testlerini yaz: test senaryolarında {kalem} kalemine bağlı her
+          TS-ID için testler/{taraf}/{kalem_kucuk}/ altına bir test; varsa eski sistemin örnek verisinden
+          altın testler. Uygulama henüz yok; testler doğru sebeple kırmızı olmalı.
+        girdiler: [analiz, teknik-plan, teslim-plani, test-senaryolari, test-altyapisi]
+        cikti: "{kalem_kucuk}-kabul-testi"
+        yazabilir: ["testler/{taraf}/{kalem_kucuk}"]
+        kilitle: ["testler/{taraf}/{kalem_kucuk}"]
+        dogrulama:
+          - ad: Senaryo incelemesi
+            inceleyen: analist
+            odak: "{kalem} testleri bu kalemin kurallarını ve uç durumlarını hedef analizdeki gibi sınıyor mu?"
+          - ad: Eşdeğerlik
+            inceleyen: mevcut-sistem-analisti
+            odak: "{kalem} testlerinin beklenen sonuçları, korunan eski kurallarda eski sistemin davranışıyla aynı mı?"
+          - ad: Kapsama onayı
+            inceleyen: test-analisti
+            odak: "{kalem} kalemine bağlı her TS-ID'nin otomatik testi var mı?"
+        en_fazla_tur: 2
+
+      - id: is-kalemi
+        ad: İş kalemi
+        ajan: "{gelistirici}"
+        calisma_dizini: kod
+        gorev: >
+          {kalem} kalemini yaz: {kapsam} Teknik plana ve hedef yığına uy; temiz kod (saf domain, açık
+          isimler, küçük fonksiyonlar). Bu kalemin ve önceki kalemlerin kilitli testlerinin hepsi yeşil olmalı.
+        girdiler: [analiz, teknik-plan, teslim-plani, "{kalem_kucuk}-kabul-testi"]
+        cikti: "{kalem_kucuk}-is-notu"
+        yazabilir: ["{alan}"]
+        dogrulama:
+          - ad: Testler
+            komut: "bash test-{taraf}.sh"
+            sure_dk: 15
+          - ad: Uygunluk
+            inceleyen: analist
+            odak: Kod {kalem} kalemine ait kuralları ve hata davranışını hedef analize uygun karşılıyor mu?
+          - ad: Eşdeğerlik
+            inceleyen: mevcut-sistem-analisti
+            odak: Kod, korunan eski kurallarda (yuvarlama, gün sayımı, sıralama, boş ve negatif durumlar) eski sistemle aynı mı davranıyor?
+          - ad: Kod incelemesi
+            inceleyen: mimar
+            odak: Kod plana uygun ve temiz mi (domain saf, portlar doğru, isimler açık)? Hard-code ya da eski yapının kopyası var mı?
+          - ad: Test incelemesi
+            inceleyen: test-analisti
+            odak: Kod testleri gerçekten mi geçiyor? Test girdilerine özel dal ya da testi anlamsızlaştıran bir hile var mı?
+          - ad: Güvenlik incelemesi
+            inceleyen: guvenlik
+            odak: Kodda KRİTİK ya da YÜKSEK seviyede güvenlik açığı var mı?
+        en_fazla_tur: 4
+
+  - id: birlestirme
+    ad: Birleştirme
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: >
+      Kalemleri uçtan uca bağlayan senaryoları testler/be/entegrasyon/ altına yaz (varsa eski sistemin
+      örnek verisiyle tam bir gün sonu) ve bütün testleri birlikte koş. Uygulama hatası bulursan düzeltme;
+      "UYGULAMA HATASI:" diye ilgili kalemle yaz.
+    girdiler: [analiz, teknik-plan, test-senaryolari, kalemler]
+    cikti: birlestirme
+    yazabilir: [testler/be/entegrasyon]
+    kilitle: [testler/be/entegrasyon]
+    dogrulama:
+      - ad: Bütün testler
+        komut: bash test-be.sh
+        sure_dk: 15
+      - ad: Birleştirme onayı
+        inceleyen: mimar
+        odak: Kalemler birlikte plandaki gibi çalışıyor mu? Çelişen ya da tekrar eden kod var mı?
+    en_fazla_tur: 2
+
+  - id: entegrasyon
+    ad: Entegrasyon kılavuzu
+    ajan: mimar
+    gorev: >
+      Kodun projenin sahibinin sistemine nasıl entegre edileceğini yaz: modüller, uygulanacak portlar
+      (adaptörler), yapılandırma, eski tabloların eşlenmesi, eski ve yeni sistemin paralel koşup sonuçlarının
+      karşılaştırılması (paralel koşum planı), geçiş ve geri dönüş adımları.
+    girdiler: [brif, analiz, teknik-plan, kalemler, birlestirme, mevcut-sistem]
+    cikti: entegrasyon
+    dogrulama:
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Kılavuz hedef analizdeki her kuralın entegre sistemde nasıl korunacağını gösteriyor mu?
+      - ad: Eşdeğerlik
+        inceleyen: mevcut-sistem-analisti
+        odak: Paralel koşum planı eski ve yeni sonuçları kural kural karşılaştırıyor mu? Eski sistemin yan etkileri (yazdığı tablolar, fişler) karşılanmış mı?
+    en_fazla_tur: 2
+
+  - id: teslim
+    ad: Teslim paketi
+    ajan: proje-yoneticisi
+    gorev: >
+      Teslim paketini yaz: kalem kalem ne teslim edildi, eski kuralların durumu (korundu, değişti,
+      bırakıldı), test sonuçları, alınan kararlar, bilinen sınırlar ve açık riskler.
+    girdiler: [brif, teslim-plani, kalemler, birlestirme, entegrasyon, kararlar]
+    cikti: teslim
+    dogrulama:
+      - ad: PO onayı
+        inceleyen: urun-sahibi
+        odak: Teslim paketi kabul kriterlerini doğru yansıtıyor mu? Girdilerde olmayan bir başarı iddiası var mı?
+    en_fazla_tur: 2
+
+  - id: kabul
+    ad: Kabul
+    tur: insan
+    soru: Mevcut sistem yeniden yazıldı; testler ve onay kurulları tamam. Entegrasyon kılavuzunu ve teslim paketini incele; kabul et ya da notunla geri gönder.
+
+  - id: gelisim
+    ad: Gelişim önerileri
+    tur: gelisim
+    ajan: urun-sahibi
+    gorev: >
+      Yeniden yazılan sistemi kullanıcı ve işletme gözüyle değerlendir; onu daha iyiye götürecek 2-5
+      gelişim önerisi getir. Gelişim defterindeki kararlara uy. Belgenin sonuna kovan-gelisim bloğunu ekle.
+    girdiler: [brif, teslim, gelisim-defteri]
+    cikti: gelisim-onerileri

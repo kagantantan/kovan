@@ -1,36 +1,43 @@
 ad: Tam yığın (FE + BE)
 aciklama: >
-  Arayüzü olan işler. UX tıklanabilir prototip ve arayüz sözleşmesi üretir; test analisti
-  FE ve BE senaryolarını, test otomasyon bunların otomatik testlerini yazar (kilitlenir).
-  Kodu BE ve FE yazılımcıları kendi klasörlerinde yazar (hibritte yerel Qwen); her
-  aşama onay kurulundan geçer.
-fikir_butcesi_usd: 12
+  Arayüzü olan işler. Kod yazılmadan önce derin planlama: kapsam ve kabul paketi, analiz (uç
+  durum ve kalite dahil), UX tasarımı ve tıklanabilir prototip, teknik plan, teslim planı, FE ve
+  BE test senaryoları, test altyapısı. Sonra her iş kalemi sırayla: önce kabul testi yazılır ve
+  kilitlenir, sonra kalemin yazılımcısı (BE ya da FE) kodu yazar; her biri kendi onay kurulundan
+  geçer. Ardından birleştirme, teslim paketi, senin kabulün ve gelişim önerileri.
+fikir_butcesi_usd: 18
 
 asamalar:
   - id: brif
-    ad: Brif
+    ad: Kapsam ve kabul paketi
     ajan: urun-sahibi
-    gorev: Fikri ürün brifine çevir. Arayüz ihtiyacını açıkça belirt.
+    gorev: >
+      Fikri kapsam ve kabul paketine çevir: problem, hedef kullanıcı, kapsam içi ve dışı,
+      ölçülebilir kabul kriterleri (K1, K2...). Arayüz ihtiyacını açıkça belirt.
     girdiler: [fikir]
     cikti: brif
 
   - id: analiz
-    ad: Analiz
+    ad: Analiz belgesi
     ajan: analist
-    gorev: Brifi kurallara, uç durumlara ve hata davranışına aç; kullanıcının göreceği hata durumlarını da yaz.
+    gorev: Kapsam paketini kurallara, uç durumlara ve hata davranışına aç; kullanıcının göreceği hata durumlarını da yaz.
     girdiler: [fikir, brif]
     cikti: analiz
     dogrulama:
-      - ad: PO onayı
+      - ad: Kapsam onayı
         inceleyen: urun-sahibi
         odak: Analiz brifteki her kabul kriterini kapsıyor mu? Kapsam dışına taşan bir şey var mı?
-      - ad: Mimar onayı
+      - ad: Uygulanabilirlik
         inceleyen: mimar
         odak: Kurallar teknik olarak uygulanabilir ve test edilebilir mi? Çelişkili kural var mı?
-      - ad: Mevzuat onayı
+      - ad: Uç durum ve kalite
+        inceleyen: test-analisti
+        odak: Her kural test edilebilir mi? Uç durumlar, hata davranışı ve kullanıcıya görünen hata durumları eksiksiz mi?
+      - ad: Mevzuat
         inceleyen: mevzuat
+        atlanabilir: true        # mevzuat konusu yoksa "kapsam dışı" der; sonraki aşamalarda çağrılmaz
         odak: Kişisel veri, rıza, saklama ya da finansal bilgilendirme açısından eksik bir gereksinim var mı?
-    en_fazla_tur: 2
+    en_fazla_tur: 3
 
   - id: ux-tasarim
     ad: UX tasarım
@@ -48,15 +55,18 @@ asamalar:
       - ad: Analist onayı
         inceleyen: analist
         odak: Analizdeki her hata durumu ve uç durum bir ekran durumu olarak tasarlanmış mı?
-      - ad: Mevzuat onayı
+      - ad: Mevzuat
         inceleyen: mevzuat
+        atlanabilir: true
         odak: Aydınlatma/rıza metinleri, önceden işaretli kutu olmaması ve temel erişilebilirlik tasarımda var mı?
     en_fazla_tur: 2
 
   - id: teknik-plan
     ad: Teknik plan
     ajan: mimar
-    gorev: Analizi ve UX tasarımını en sade doğru teknik plana çevir (backend/ ve frontend/). Arayüz sözleşmesini koru.
+    gorev: >
+      Analizi ve UX tasarımını en sade doğru teknik plana çevir (backend/ ve frontend/). Arayüz
+      sözleşmesini koru. Uygulama sırasını öner.
     girdiler: [brif, analiz, ux-ozeti]
     cikti: teknik-plan
     dogrulama:
@@ -66,16 +76,39 @@ asamalar:
       - ad: Güvenlik onayı
         inceleyen: guvenlik
         odak: Tehdit modeli, girdi doğrulama (FE ve BE), XSS, gizli bilgi ve kişisel veri kararları yeterli mi?
-      - ad: Mevzuat onayı
+      - ad: Mevzuat
         inceleyen: mevzuat
+        atlanabilir: true
         odak: Veri saklama, loglama ve üçüncü taraf servis kararları uyum açısından sorun yaratıyor mu?
+    en_fazla_tur: 2
+
+  - id: teslim-plani
+    ad: Teslim planı
+    ajan: proje-yoneticisi
+    gorev: >
+      Analizi, UX tasarımını ve teknik planı 2-6 sıralı iş kalemine böl (P1, P2...). Her kalemin
+      yazılımcısı be-yazilimci ya da fe-yazilimci; FE kalemi kullandığı BE kaleminden sonra gelir.
+      Belgenin sonuna kovan-plan bloğunu ekle.
+    girdiler: [brif, analiz, ux-ozeti, teknik-plan]
+    cikti: teslim-plani
+    dogrulama:
+      - ad: Plan biçimi
+        plan: true
+      - ad: Kapsam onayı
+        inceleyen: urun-sahibi
+        odak: Her kabul kriteri bir kaleme düşüyor mu? Sıra değeri erken veriyor mu? Kapsam dışı kalem var mı?
+      - ad: Teknik sıra
+        inceleyen: mimar
+        odak: Kalemler teknik plana bağlı mı, bağımlılıklar (FE↔BE dahil) doğru mu, her kalem tek başına test edilebilir mi?
     en_fazla_tur: 2
 
   - id: test-senaryolari
     ad: Test senaryoları
     ajan: test-analisti
-    gorev: Kabul kriterleri, uç durumlar ve ekran durumları için FE ve BE test senaryolarını çıkar.
-    girdiler: [brif, analiz, ux-ozeti, teknik-plan]
+    gorev: >
+      Kabul kriterleri, uç durumlar ve ekran durumları için FE ve BE test senaryolarını çıkar; her
+      senaryoyu bir iş kalemine (P1, P2...) bağla.
+    girdiler: [brif, analiz, ux-ozeti, teknik-plan, teslim-plani]
     cikti: test-senaryolari
     dogrulama:
       - ad: PO onayı
@@ -83,80 +116,142 @@ asamalar:
         odak: Senaryolar her kabul kriterini ürün gözüyle sınıyor mu?
       - ad: Analist onayı
         inceleyen: analist
-        odak: Her kural, uç durum ve hata ekranı için senaryo var mı, beklenen sonuçlar analizle uyumlu mu?
+        odak: Her kural, uç durum ve hata ekranı için senaryo var mı, beklenen sonuçlar analizle uyumlu mu, her senaryo doğru kaleme bağlı mı?
     en_fazla_tur: 2
 
-  - id: otomatik-testler
-    ad: Otomatik testler
+  - id: test-altyapisi
+    ad: Test altyapısı
     ajan: test-otomasyon
     calisma_dizini: kod
     gorev: >
-      Test senaryolarının otomatik testlerini yaz: BE testleri testler/be/ + test-be.sh,
-      FE uçtan uca testleri testler/fe/ + test-fe.sh (arayüz sözleşmesindeki kimliklerle).
-    girdiler: [teknik-plan, test-senaryolari, ux-ozeti]
-    cikti: test-ozeti
+      Test altyapısını kur: testler/package.json, testler/playwright.config.ts, test-be.sh ve
+      test-fe.sh. Betikler testler/be/ ve testler/fe/ altındaki bütün kalem klasörlerini koşsun;
+      henüz test yoksa yeşil dönsün. Kalem testlerini bu aşamada yazma.
+    girdiler: [teknik-plan, teslim-plani, test-senaryolari, ux-ozeti]
+    cikti: test-altyapisi
     yazabilir: [testler, test-be.sh, test-fe.sh]
-    kilitle: [testler, test-be.sh, test-fe.sh]
+    kilitle: [test-be.sh, test-fe.sh, testler/package.json, testler/playwright.config.ts]
     dogrulama:
-      - ad: Kapsama onayı
+      - ad: Altyapı çalışıyor
+        komut: bash test-be.sh
+        sure_dk: 10
+      - ad: Altyapı onayı
         inceleyen: test-analisti
-        odak: Her TS-ID'nin (FE ve BE) otomatik testi var mı ve beklenen sonuçlar senaryolarla uyumlu mu?
+        odak: Betikler bütün kalem klasörlerini koşacak mı? Senaryolardaki her kalemin testi bu düzene sığıyor mu?
     en_fazla_tur: 2
 
-  - id: be-gelistirme
-    ad: BE geliştirme
-    ajan: be-yazilimci
+  # Teslim planındaki her kalem için aşağıdaki adımlar sırayla tekrarlanır (P1 Kabul testi, P1 İş kalemi, P2 ...).
+  - id: kalemler
+    ad: İş kalemleri
+    tur: kalemler
+    plan: teslim-plani
+    geri_donus: teslim-plani
+    gelistiriciler:
+      be-yazilimci: { alan: backend, taraf: be }
+      fe-yazilimci: { alan: frontend, taraf: fe }
+    adimlar:
+      - id: kabul-testi
+        ad: Kabul testi
+        ajan: test-otomasyon
+        calisma_dizini: kod
+        gorev: >
+          {kalem} ({baslik}) için kabul testlerini yaz: test senaryolarında {kalem} kalemine bağlı her
+          TS-ID için testler/{taraf}/{kalem_kucuk}/ altına bir test. FE testleri arayüz sözleşmesindeki
+          kimlikleri kullanır. Uygulama henüz yok; testler doğru sebeple kırmızı olmalı.
+        girdiler: [analiz, ux-ozeti, teknik-plan, teslim-plani, test-senaryolari, test-altyapisi]
+        cikti: "{kalem_kucuk}-kabul-testi"
+        yazabilir: ["testler/{taraf}/{kalem_kucuk}"]
+        kilitle: ["testler/{taraf}/{kalem_kucuk}"]
+        dogrulama:
+          - ad: Senaryo incelemesi
+            inceleyen: analist
+            odak: "{kalem} testleri bu kalemin kurallarını, uç durumlarını ve hata ekranlarını analizdeki gibi sınıyor mu?"
+          - ad: Kapsama onayı
+            inceleyen: test-analisti
+            odak: "{kalem} kalemine bağlı her TS-ID'nin otomatik testi var mı, beklenen sonuçlar senaryolarla uyumlu mu?"
+        en_fazla_tur: 2
+
+      - id: is-kalemi
+        ad: İş kalemi
+        ajan: "{gelistirici}"
+        calisma_dizini: kod
+        gorev: >
+          {kalem} kalemini yaz: {kapsam} Teknik plana ve arayüz sözleşmesine uy. Bu kalemin ve önceki
+          kalemlerin kilitli testlerinin hepsi yeşil olmalı.
+        girdiler: [analiz, ux-ozeti, teknik-plan, teslim-plani, "{kalem_kucuk}-kabul-testi"]
+        cikti: "{kalem_kucuk}-is-notu"
+        yazabilir: ["{alan}"]
+        dogrulama:
+          - ad: Testler
+            komut: "bash test-{taraf}.sh"
+            sure_dk: 15            # FE'de ilk çalıştırmada Playwright'ın chromium'u iner
+          - ad: Uygunluk
+            inceleyen: analist
+            odak: Kod {kalem} kalemine ait kuralları, hata davranışını ve kullanıcıya görünen metinleri analize uygun karşılıyor mu?
+          - ad: Kod incelemesi
+            inceleyen: mimar
+            odak: Kod plana uygun ve sade mi? FE↔BE arayüzü plandaki gibi mi? Hard-code ya da plan dışı karmaşıklık var mı?
+          - ad: Test incelemesi
+            inceleyen: test-analisti
+            odak: Kod testleri gerçekten mi geçiyor? Test girdilerine özel dal ya da testi anlamsızlaştıran bir hile var mı?
+          - ad: Güvenlik incelemesi
+            inceleyen: guvenlik
+            odak: XSS, güvensiz HTML, istemcide gizli bilgi ya da sunucuda KRİTİK/YÜKSEK bir açık var mı?
+          - ad: UX onayı
+            inceleyen: ux-tasarimci
+            taraf: fe               # yalnızca FE kalemlerinde
+            odak: Ekranlar, durumlar, metinler ve erişilebilirlik tasarıma uygun mu?
+        en_fazla_tur: 4
+
+  - id: birlestirme
+    ad: Birleştirme
+    ajan: test-otomasyon
     calisma_dizini: kod
-    gorev: Teknik plana uyarak kilitli BE testlerini geçen en sade kodu backend/ altına yaz.
-    girdiler: [teknik-plan, analiz, test-ozeti]
-    cikti: be-notu
-    yazabilir: [backend]
+    gorev: >
+      Kalemleri uçtan uca bağlayan senaryoları testler/be/entegrasyon/ ve testler/fe/entegrasyon/
+      altına yaz ve bütün testleri birlikte koş. Uygulama hatası bulursan düzeltme; "UYGULAMA HATASI:"
+      diye ilgili kalemle yaz.
+    girdiler: [analiz, ux-ozeti, teknik-plan, test-senaryolari, kalemler]
+    cikti: birlestirme
+    yazabilir: [testler/be/entegrasyon, testler/fe/entegrasyon]
+    kilitle: [testler/be/entegrasyon, testler/fe/entegrasyon]
     dogrulama:
       - ad: BE testleri
         komut: bash test-be.sh
-        sure_dk: 10            # ilk çalıştırmada npm paketleri iner
-      - ad: Mimar onayı
-        inceleyen: mimar
-        odak: Kod plana uygun, sade ve doğru mu? Hard-code, plan dışı karmaşıklık ya da sayısal hassasiyet sorunu var mı?
-      - ad: PO onayı
-        inceleyen: urun-sahibi
-        odak: Kabul kriterleri karşılanıyor mu? Hata mesajları doğru ve anlaşılır mı?
-      - ad: Güvenlik onayı
-        inceleyen: guvenlik
-        odak: Kodda KRİTİK ya da YÜKSEK seviyede güvenlik açığı var mı?
-    en_fazla_tur: 4
-
-  - id: fe-gelistirme
-    ad: FE geliştirme
-    ajan: fe-yazilimci
-    calisma_dizini: kod
-    gorev: UX tasarımına, arayüz sözleşmesine ve plana uyarak kilitli FE testlerini geçen arayüzü frontend/ altına yaz.
-    girdiler: [teknik-plan, ux-ozeti, test-ozeti, be-notu]
-    cikti: fe-notu
-    yazabilir: [frontend]
-    dogrulama:
+        sure_dk: 10
       - ad: FE testleri
         komut: bash test-fe.sh
-        sure_dk: 15            # ilk çalıştırmada npm paketleri ve Playwright'ın chromium'u iner
-      - ad: Mimar onayı
+        sure_dk: 15
+      - ad: Birleştirme onayı
         inceleyen: mimar
-        odak: Kod plana uygun ve sade mi? FE↔BE arayüzü plandaki gibi mi?
+        odak: Kalemler birlikte plandaki gibi çalışıyor mu? FE↔BE arayüzü tutarlı mı? Çelişen ya da tekrar eden kod var mı?
+    en_fazla_tur: 2
+
+  - id: teslim
+    ad: Teslim paketi
+    ajan: proje-yoneticisi
+    gorev: >
+      Teslim paketini yaz: kalem kalem ne teslim edildi, uygulama nasıl açılır ve çalıştırılır,
+      test sonuçları, alınan kararlar, bilinen sınırlar ve açık riskler.
+    girdiler: [brif, teslim-plani, kalemler, birlestirme, kararlar]
+    cikti: teslim
+    dogrulama:
       - ad: PO onayı
         inceleyen: urun-sahibi
-        odak: Kullanıcı kabul kriterlerini ekranda gerçekleştirebiliyor mu? Metinler doğru mu?
-      - ad: UX onayı
-        inceleyen: ux-tasarimci
-        odak: Ekranlar, durumlar, metinler ve erişilebilirlik tasarıma uygun mu?
-      - ad: Güvenlik onayı
-        inceleyen: guvenlik
-        odak: XSS, güvensiz HTML ekleme ya da istemcide gizli bilgi gibi KRİTİK/YÜKSEK açık var mı?
-      - ad: Mevzuat onayı
-        inceleyen: mevzuat
-        odak: Rıza/aydınlatma metinleri ve erişilebilirlik uygulamada da doğru mu?
-    en_fazla_tur: 4
+        odak: Teslim paketi kabul kriterlerini doğru yansıtıyor mu? Girdilerde olmayan bir başarı iddiası var mı?
+    en_fazla_tur: 2
 
   - id: kabul
     ad: Kabul
     tur: insan
     soru: Arayüz, backend, testler ve onay kurulları tamam. Prototipi ve uygulamayı incele; kabul et ya da geri gönder.
-    geri_donus: fe-gelistirme
+
+  - id: gelisim
+    ad: Gelişim önerileri
+    tur: gelisim
+    ajan: urun-sahibi
+    gorev: >
+      Teslim edilen ürünü kullanıcı gözüyle değerlendir ve onu daha iyiye götürecek 2-5 gelişim önerisi
+      getir. Gelişim defterindeki kararlara uy. Belgenin sonuna kovan-gelisim bloğunu ekle.
+    girdiler: [brif, teslim, gelisim-defteri]
+    cikti: gelisim-onerileri

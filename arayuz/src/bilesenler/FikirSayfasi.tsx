@@ -4,8 +4,10 @@ import { api, type DurumYaniti, type FikirDetayi } from "../api";
 import { FIKIR_DURUMU, MOD_ADI, para, sure } from "../bicim";
 import { useYokla } from "../kullan";
 import { DosyaGorunumu } from "./DosyaGorunumu";
+import { GelisimPaneli } from "./GelisimPaneli";
 import { KararPaneli } from "./KararPaneli";
 import { Petek } from "./Petek";
+import { PlanTablosu } from "./PlanTablosu";
 import { Simge } from "./Simge";
 import { SoruPaneli } from "./SoruPaneli";
 import { ZamanCizelgesi } from "./ZamanCizelgesi";
@@ -54,6 +56,8 @@ export function FikirSayfasi({ id, durum, ajanAdlari, onDegisti }: Props) {
   const claudeSayisi = cagrilar.filter(([m]) => m === "claude").reduce((t, [, n]) => t + n, 0);
   const yerelSayisi = cagrilar.filter(([m]) => yerelMi(m)).reduce((t, [, n]) => t + n, 0);
   const doluluk = f.butce_usd ? Math.min(1, f.maliyet_usd / f.butce_usd) : 0;
+  const siradakiler = veri.asamalar.filter((a) => a.durum === "bekleyen").map((a) => a.ad);
+  const ekipKarari = veri.kararlar.filter((k) => k.karar_veren === "ekip").length;
 
   return (
     <div className="fikir">
@@ -75,14 +79,27 @@ export function FikirSayfasi({ id, durum, ajanAdlari, onDegisti }: Props) {
         </div>
         <dl className="olculer">
           <div className={`olcu olcu--durum olcu--${f.durum}`}><dt>Durum</dt><dd>{FIKIR_DURUMU[f.durum]}</dd></div>
-          <div className="olcu"><dt>Akış</dt><dd>{veri.akis_ad}</dd></div>
+          <div className="olcu"><dt>Akış</dt><dd>{veri.akis_ad}
+            {(f.surum ?? 1) > 1 && <span className="olcu-ek"> sürüm {f.surum}{f.temel_fikir ? <>, <a href={`#/fikirler/${f.temel_fikir}`}>{f.temel_fikir}</a> üzerine</> : null}</span>}
+          </dd></div>
           <div className="olcu"><dt>Mod</dt><dd>{MOD_ADI[f.motor]}</dd></div>
+          {f.kaynak && (
+            <div className="olcu" title={`Kilitli, salt okunur kopya. Alındığı yer: ${f.kaynak.yollar.join(", ")}`}>
+              <dt>Mevcut sistem</dt>
+              <dd>{f.kaynak.dosya_sayisi.toLocaleString("tr-TR")} dosya<span className="olcu-ek">, {f.kaynak.satir.toLocaleString("tr-TR")} satır</span></dd>
+            </div>
+          )}
           <div className="olcu">
             <dt>Ajan çağrısı</dt>
             <dd>{veri.ajan_cagrisi}
               {f.motor === "hibrit" && veri.ajan_cagrisi > 0 && <span className="olcu-ek"> Claude {claudeSayisi}, yerel {yerelSayisi}</span>}
             </dd>
           </div>
+          {veri.kararlar.length > 0 && (
+            <div className="olcu" title="Ajan soruları önce ekipte oylanır; oybirliği çıkarsa sana sorulmaz.">
+              <dt>Kararlar</dt><dd>ekip {ekipKarari}, sen {veri.kararlar.length - ekipKarari}</dd>
+            </div>
+          )}
           <div className="olcu"><dt>Ajanların çalıştığı süre</dt><dd>{sure(veri.aktif_sure_sn)}</dd></div>
           <div className="olcu olcu--butce" title="Abonelikte faturalanmaz; kullanım limitinden ne kadar yediğini gösterir.">
             <dt>Kullanım / bütçe</dt>
@@ -95,10 +112,15 @@ export function FikirSayfasi({ id, durum, ajanAdlari, onDegisti }: Props) {
 
       <Petek hucreler={veri.asamalar} tur={f.tur} ekTur={f.ek_tur} yerelMi={yerelMi} odak={odak}
         onSec={(a) => setOdak((o) => (o === a ? null : a))} etiket={`${veri.akis_ad} akışının aşamaları`} />
+      {f.durum !== "tamamlandi" && siradakiler.length > 0 && (
+        <p className="sirada"><span className="sirada-ad">Sırada</span> {siradakiler.slice(0, 7).join(" → ")}{siradakiler.length > 7 ? ` → +${siradakiler.length - 7}` : ""}</p>
+      )}
 
       {f.durum === "bekliyor" && veri.bekleme && (veri.bekleme.sebep === "ajan_sorusu"
         ? <SoruPaneli key={veri.bekleme.adim_id} fikirId={id} bekleme={veri.bekleme} onBitti={bitti} />
         : <KararPaneli key={veri.bekleme.adim_id} fikirId={id} bekleme={veri.bekleme} onBitti={bitti} />)}
+      {veri.plan && <PlanTablosu plan={veri.plan} onSec={(a) => setOdak(a)} />}
+      {f.durum === "tamamlandi" && <GelisimPaneli key={`${f.id}-${veri.gelisim.length}-${f.sonraki_surum ?? ""}`} detay={veri} onBitti={bitti} />}
 
       <div className="calisma-alani">
         <section className="panel panel--cizelge" aria-label="Zaman çizelgesi">

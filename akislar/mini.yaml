@@ -1,8 +1,10 @@
 ad: Mini
 aciklama: >
   Küçük işler için 4 aşama: brif, kilitli otomatik testler, BE kodu (testler gerçekten
-  çalıştırılır) ve senin kabulün. Onay kurulu yok, seremoni en az.
+  çalıştırılır) ve senin kabulün. Onay kurulu ve ortak karar yok: ajan soruları doğrudan
+  sana gelir. Seremoni en az.
 fikir_butcesi_usd: 3
+ortak_karar: false
 
 asamalar:
   - id: brif
