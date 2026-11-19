@@ -251,6 +251,11 @@ describe("Replatform akışı", () => {
     expect(ikinci).toContain("### Kaynak atıfları: GEÇERSİZ");
     expect(ikinci).toContain(`${PKB}:999: dosya 48 satır; bu satırlar yok`);
     expect(ikinci).toContain("kaynak/reeskont-eski/YOK.pkb:3: böyle bir dosya yok");
+    // Salt okunur aşamada belge son mesajdadır, dosyada değil: revizyon turu önceki belgeyi görür, baştan yazmaz
+    expect(ikinci).toContain("## Önceki çıktın\nBu, önceki turda yazdığın");
+    expect(ikinci).toContain(`- E1: faiz ${PKB}:999`);
+    expect(ikinci).not.toContain("Önceki turdaki dosyaların yerinde duruyor");
+    expect(ikinci).not.toContain("Mevcut dosyalar:");
   });
 });
 

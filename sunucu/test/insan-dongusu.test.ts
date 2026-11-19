@@ -81,6 +81,8 @@ describe("Analiz aşamalarında insan döngüsü", () => {
     expect(d.adimlar.some((a) => a.tip === "oy")).toBe(false);
     const ilk = JSON.parse(dosya(k, fid, `gunluk/adim-${d.adimlar.find((a) => a.tip === "uret")!.id}.json`));
     expect(ilk.sistem).toContain("# Önce soru (kontrol noktası)");
+    // Soru sahibine gider: kimliksiz, örnekli, kendi içinde anlaşılır yazılmalı
+    expect(ilk.sistem).toContain("Kimlikleri (E1, H3, Ş12, ŞÜPHE-6, FARK-2, K4, P2) tek başına kullanma");
 
     k.ork.cevapla(fid, [{ secilenler: ["Koddaki gibi 365"] }]);
     await bekle(k, fid, bekliyor("insan"));
@@ -89,6 +91,7 @@ describe("Analiz aşamalarında insan döngüsü", () => {
     expect(uretler.map((a) => a.durum)).toEqual(["soru", "tamam"]);
     const ikinci = JSON.parse(dosya(k, fid, `gunluk/adim-${uretler[1].id}.json`));
     expect(ikinci.sistem).not.toContain("# Önce soru");                       // ikinci üretimde normal soru kuralları
+    expect(ikinci.sistem).toContain("belgeleri ve kodu hiç görmemiş bir iş insanı");   // normal soru kurallarında da
     expect(ikinci.istem).toContain("Koddaki gibi 365");
     expect(dosya(k, fid, "belgeler/analiz.md")).toContain("Kararlara göre yazıldı.");
   });

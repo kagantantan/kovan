@@ -43,6 +43,10 @@ paralel_fikir: 1
 # Bir aşamanın onay kurulu (Mimar, PO, Güvenlik...) aynı anda mı çalışsın. false: sırayla.
 paralel_inceleme: true
 
+# Revizyon turunda, önceki turda ONAY veren onaycı yeniden bakmasın (token tasarrufu). Testler ve sistem
+# denetimleri her turda koşar; aşamaya geri gönderilince ya da aşama yeniden doğrulanınca herkes yeniden bakar.
+onayi_koru: true
+
 # Geçici hatada (yoğunluk, ağ) bir adım kaç kez denensin. Kalıcı hatalar (oturum yok,
 # limit doldu, Ollama kapalı) tekrar denenmez, doğrudan sana sorulur.
 deneme_sayisi: 2

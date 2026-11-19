@@ -127,7 +127,10 @@ flowchart TD
 ```
 
 - Kırmızı koda onay kurulu çağrılmaz; önce testler yeşile döner.
-- Bulgular, üreten ajana bir sonraki turda "Düzeltme istekleri" olarak gider.
+- Bulgular, üreten ajana bir sonraki turda "Düzeltme istekleri" olarak gider; önceki çıktısı da yanında gider, belgeyi baştan yazmaz.
+- **Belge bütünlüğü.** Revizyonda yeni belge öncekinin tamamı olmalı. Önceki sürümdeki bir kimlik (E5, H2, K3, FARK-1...) yeni sürümde yoksa ya da belge yarıdan fazla kısaldıysa, sistem belgeyi onay kuruluna göndermeden geri çevirir ve önceki sürümü yeniden yürürlüğe koyar. Bir kural bilerek kaldırılıyorsa kimliği "Kaldırılanlar" bölümünde yazılır.
+- **Sorular sana anlaşılır gelir.** Ajanlara, soruyu belgeyi görmemiş birine sorar gibi yazmaları söylenir: E18, H1 gibi kimlikler tek başına kullanılmaz, dosya ve satır numarası soruya girmez, somut bir örnek verilir.
+- **Onay korunur (token tasarrufu).** Revizyon turunda yalnızca düzeltme isteyen onaycılar yeniden bakar; önceki turda ONAY veren bakmaz, zaman çizelgesine "Onay korundu" düşer. Testler ve sistem denetimleri (atıf, plan, ADR) her turda koşar. Aşamaya geri gönderilince ya da aşama yeniden doğrulanınca herkes yeniden bakar. Kapatmak için `kovan.yaml`'da `onayi_koru: false`.
 - Onaycı soru sorduysa, cevabından sonra yazar ajan kararını ve aynı turdaki DÜZELT bulgularını tek turda işler; kurul yeniden bakar.
 - Geri gönderilen bir aşamadan sonraki aşamalar **yeniden yazılmaz**, yalnızca yeniden doğrulanır. Sorun bulunursa normal döngü işler.
 
@@ -734,6 +737,7 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 | "Node.js eski" | [nodejs.org](https://nodejs.org)'dan LTS sürümünü (22+) kur |
 | "Paket kurulumu başarısız" | İnternet bağlantını kontrol et; Terminal'de `npm install` çalıştırıp hatayı gör |
 | "Çalışan bir fikir silinemez; önce durdur." | Fikir ekranında **Durdur**, sonra **Sil** |
+| "Belge bütünlüğü: GEÇERSİZ" | Ajan revizyonda belgeyi kısmen ya da baştan yazdı; önceki sürüm geri kondu, bulgu ajana döndü. Genelde sonraki turda düzelir |
 | "ADR biçimi: GEÇERSİZ" | Mimar'ın `kovan-adr` bloğu eksik ya da bozuk; sistem bulguyu mimara geri gönderir, genelde bir sonraki turda düzelir. Tur sınırına gelirse bulgulardaki maddeye bak (ör. "en az iki seçenek olmalı", "'calisma_bicimi' alanında bir ADR yok") |
 | "Port 8765 kullanımda" | Kovan zaten açık olabilir; değilse `kovan.yaml`'da `port`'u değiştir |
 | "Yerel hazır değil: Ollama'ya ulaşılamadı" | Ollama uygulamasını aç |

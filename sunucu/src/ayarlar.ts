@@ -53,6 +53,7 @@ export interface Ayarlar {
   api_anahtarini_yoksay: boolean;   // Claude ajanlarında yönlendirme değişkenlerini temizle
   paralel_fikir: number;
   paralel_inceleme: boolean;
+  onayi_koru: boolean;              // revizyon turunda önceki turda onaylayan onaycı yeniden bakmaz
   deneme_sayisi: number;
   deneme_gecikme_sn: number;
   calisma_dizini: string | null;
@@ -74,6 +75,7 @@ export const VARSAYILAN: Ayarlar = {
   api_anahtarini_yoksay: true,
   paralel_fikir: 1,
   paralel_inceleme: true,
+  onayi_koru: true,
   deneme_sayisi: 2,
   deneme_gecikme_sn: 1,
   calisma_dizini: null,

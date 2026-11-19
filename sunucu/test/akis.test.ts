@@ -108,8 +108,10 @@ describe("Standart akış: derin planlama ve iş kalemleri", () => {
     const analiz = d.adimlar.filter((a) => a.asama_id === "analiz" && (a.tip === "uret" || a.tip === "inceleme"));
     expect(analiz.map((a) => `${a.tur}:${a.tip}:${a.durum}`)).toEqual([
       "1:uret:tamam", "1:inceleme:duzelt", "1:inceleme:duzelt", "1:inceleme:onay", "1:inceleme:soru",
-      "2:uret:tamam", "2:inceleme:onay", "2:inceleme:onay", "2:inceleme:onay", "2:inceleme:onay",
+      "2:uret:tamam", "2:inceleme:onay", "2:inceleme:onay", "2:inceleme:onay",   // 1. turda onaylayan yeniden bakmadı
     ]);
+    const korunan = d.adimlar.filter((a) => a.asama_id === "analiz" && a.ajan_ad === "Onay korundu");
+    expect(korunan.map((a) => [a.tur, a.ozet])).toEqual([[2, expect.stringMatching(/: önceki turda onayladı; bu turda yeniden bakmıyor\.$/)]]);
     const ikinciTur = istemi(k, fid, analiz[5].id);
     expect(ikinciTur).toContain("## Düzeltme istekleri");
     expect(ikinciTur).toContain("Karar (projenin sahibi): Evet, e-posta ile giriş · Not: Şifresiz, tek kullanımlık bağlantı");
@@ -145,7 +147,7 @@ describe("Standart akış: derin planlama ve iş kalemleri", () => {
     expect(istemi(k, fid, d.adimlar.find((a) => a.asama_id === "birlestirme" && a.tip === "uret")!.id)).toContain("## P3 'Suladım' işareti (BCKD)");
     expect(f.bekleme!.varsayilan_hedef).toBe("p3-is-kalemi");          // teslimdeki notun varsayılan hedefi son kod kalemi
     expect(f.bekleme!.detay).toContain("Ekibin kendi aldığı kararlar:\n  Arayüz dili: Türkçe");
-    expect(d.ajan_cagrisi).toBe(63);
+    expect(d.ajan_cagrisi).toBe(59);   // revizyon turlarında önceki turda onaylayanlar yeniden bakmadı
   });
 
   it("kabulden sonra PO gelişim önerileri getirir; kabul ettiklerinle yeni sürüm kodu ve kararları devralır", async () => {
@@ -244,6 +246,6 @@ describe("Tam yığın akış", () => {
       "testler/fe/entegrasyon", "testler/fe/p3", "testler/package.json", "testler/playwright.config.ts",
     ]);
     expect(d.onizlemeler.map((o) => o.yol)).toEqual(["kod/tasarim/prototip.html", "kod/frontend/index.html"]);
-    expect(d.ajan_cagrisi).toBe(63);
+    expect(d.ajan_cagrisi).toBe(59);   // revizyon turlarında önceki turda onaylayanlar yeniden bakmadı
   });
 });

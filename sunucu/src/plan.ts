@@ -200,3 +200,24 @@ export function adrMarkdown(a: Adr, tarih: string): string {
   s.push("", "## Karar", a.karar, "", "## Gerekçe", a.gerekce, "", "## Sonuçlar", a.sonuclar, "");
   return s.join("\n");
 }
+
+/** Belgedeki kimlikler: kurallar (E3), kabul (K2), hesaplar (H1), kalemler (P2), farklar ve şüpheler (FARK-1, ŞÜPHE-6), ADR'ler. */
+const KIMLIK = /(?<![\p{L}\p{N}_-])(?:E|K|H|P|ADR-|FARK-|ŞÜPHE-)\d{1,3}(?![\p{N}])/gu;
+export const kimlikler = (metin: string): Set<string> => new Set(metin.match(KIMLIK) ?? []);
+
+/** Revizyonda yeni belge öncekinin tamamı olmalı: kimlik kaybı ya da yarıdan fazla kısalma, belgenin baştan ya da
+ *  kısmen yazıldığını gösterir (önceki turların içeriği kaybolur). Bulgu, onay kuruluna gitmeden yazara döner. */
+export function belgeButunlugu(onceki: string, yeni: string): { hatalar: string[]; ozet: string } {
+  const eski = kimlikler(onceki);
+  const simdi = kimlikler(yeni);
+  const kayip = [...eski].filter((k) => !simdi.has(k));
+  const hatalar: string[] = [];
+  if (kayip.length) {
+    hatalar.push(`Önceki sürümde olan ${kayip.length} kimlik bu sürümde yok: ${kayip.slice(0, 30).join(", ")}${kayip.length > 30 ? "..." : ""}. ` +
+      "Belge önceki sürümün tamamı olmalı: onaylanmış bölümleri aynen koru, yalnızca istenenleri düzelt. Bir kuralı bilerek kaldırıyorsan kimliğini ve nedenini \"Kaldırılanlar\" bölümünde yaz.");
+  }
+  if (yeni.trim().length < onceki.trim().length * 0.5) {
+    hatalar.push(`Belge önceki sürümün yarısından kısa (${yeni.trim().length.toLocaleString("tr-TR")} / ${onceki.trim().length.toLocaleString("tr-TR")} karakter); bölümler düşmüş görünüyor. Önceki sürümün tamamını temel al.`);
+  }
+  return { hatalar, ozet: `${simdi.size} kimlik korundu, ${yeni.trim().length.toLocaleString("tr-TR")} karakter` };
+}

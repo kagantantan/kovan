@@ -88,6 +88,7 @@ export interface Fikir {
   faz: "uret" | "dogrula";
   ek_tur: number;
   soru_turu: number;
+  onaylayanlar?: string[];   // bu aşama döngüsünde ONAY veren onaycılar (kart id); revizyon turunda yeniden bakmaz
   geri_bildirim: string | null;
   bekleme: Bekleme | null;
   butce_usd: number;
