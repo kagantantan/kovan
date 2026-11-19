@@ -45,6 +45,8 @@ export const api = {
   cevap: (id: string, cevaplar: Cevap[]) => istek<{ ok: true }>(`${yolu(id)}/cevap`, { cevaplar }),
   durdur: (id: string) => istek<{ ok: true }>(`${yolu(id)}/durdur`, {}),
   devam: (id: string) => istek<{ ok: true }>(`${yolu(id)}/devam`, {}),
+  sil: (id: string) => istek<{ ok: true; cop: string }>(`${yolu(id)}/sil`, {}),
+  klasorAc: (id: string, alt: "" | "kod" | "belgeler" = "") => istek<{ ok: true; yol: string }>(`${yolu(id)}/klasor-ac`, { alt }),
   yeniSurum: (id: string, metin: string) => istek<{ id: string }>(`${yolu(id)}/surum`, { metin }),
   anahtarAyarla: (motor: string, anahtar: string, kalici: boolean) =>
     istek<BaglantiSonucu>(`/api/motorlar/${encodeURIComponent(motor)}/anahtar`, { anahtar, kalici }),

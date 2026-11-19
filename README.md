@@ -243,10 +243,15 @@ kovan/
    └─ F-001/
       ├─ belgeler/     brif, analiz, planlar, kalem notları, kararlar.md, gelisim-defteri.md  (_surumler/ eski sürümler)
       ├─ incelemeler/  her ONAY / DÜZELT / SORU kararı
-      ├─ kod/          kaynak/ (replatform, kilitli)  tasarim/  testler/  backend/  frontend/  test-be.sh  test-fe.sh
+      ├─ kod/          ÜRÜN: backend/  frontend/  testler/  adr/ (kilitli)  kaynak/ (replatform, kilitli)  tasarim/  test-be.sh  test-fe.sh
       ├─ gunluk/       her çağrının tam istemi, komutu ve ham çıktısı
-      └─ .kovan/       fikir.json, adimlar.json, kararlar.json, plan.json, gelisim.json, kilit kaydı, anlık kopya
+      └─ .kovan/       fikir.json, adimlar.json, kararlar.json, plan.json, adr.json, gelisim.json, kilit kaydı, anlık kopya
+   └─ .cop/            silinen fikirler (F-004-20261119...); geri almak için klasörü calisma/ altına geri taşı ve Kovan'ı yeniden başlat
 ```
+
+**Ürün nerede?** Fikir ekranında başlığın altında klasörün yolu yazar; **Kodu aç** düğmesi `kod/` klasörünü Finder'da (Windows'ta Explorer) açar. Ekranda **Dosyalar** panelinin **Kod** sekmesinde de dosyaları okuyabilirsin. Ürünü kendi deposuna almak için `kod/` altındaki `backend/`, `frontend/`, `testler/` ve `adr/` klasörlerini kopyala; `kaynak/` eski sistemin kopyasıdır, ürüne girmez.
+
+**Fikir silmek.** Fikir ekranında **Sil**: fikir listeden kalkar, klasörü `calisma/.cop/` altına taşınır (kalıcı silme yok). Çalışan fikir silinmez; önce **Durdur**. Silinen fikrin numarası yeniden kullanılmaz.
 
 Her ajan çağrısı, test koşumu, soru ve karar `adimlar.json`'da bir kayıttır: aşama, tür, ajan, motor, model, tur, deneme, süre, token, maliyet, sonuç, özet ve ilgili dosya.
 
@@ -728,6 +733,7 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 |---|---|
 | "Node.js eski" | [nodejs.org](https://nodejs.org)'dan LTS sürümünü (22+) kur |
 | "Paket kurulumu başarısız" | İnternet bağlantını kontrol et; Terminal'de `npm install` çalıştırıp hatayı gör |
+| "Çalışan bir fikir silinemez; önce durdur." | Fikir ekranında **Durdur**, sonra **Sil** |
 | "ADR biçimi: GEÇERSİZ" | Mimar'ın `kovan-adr` bloğu eksik ya da bozuk; sistem bulguyu mimara geri gönderir, genelde bir sonraki turda düzelir. Tur sınırına gelirse bulgulardaki maddeye bak (ör. "en az iki seçenek olmalı", "'calisma_bicimi' alanında bir ADR yok") |
 | "Port 8765 kullanımda" | Kovan zaten açık olabilir; değilse `kovan.yaml`'da `port`'u değiştir |
 | "Yerel hazır değil: Ollama'ya ulaşılamadı" | Ollama uygulamasını aç |

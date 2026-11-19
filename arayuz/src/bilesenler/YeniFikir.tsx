@@ -49,6 +49,8 @@ export function YeniFikir({ akislar, durum, onOlustu }: { akislar: AkisOzeti[]; 
   // Bu kurulumda açık modlar (dış ayarla daraltılabilir; Claude kapalıysa Hepsi Claude yok)
   const modlar = MODLAR.filter((m) => !durum || durum.modlar.includes(m));
   const yerelMotor = durum?.yerel_motor ? durum.motorlar[durum.yerel_motor] : null;
+  // Seçili mod bu kurulumda kapalıysa (ör. dış ayar yerel modu kapattı) açık olan ilk moda geç; hiçbir mod seçilmemiş görünmesin.
+  useEffect(() => { if (durum && modlar.length && !modlar.includes(mod)) setMod(modlar[0]); }, [durum, mod, modlar.join()]);
 
   const motorUyarisi = (m: Mod): string | null => {
     if (!durum || m === "deneme") return null;
@@ -152,9 +154,12 @@ export function YeniFikir({ akislar, durum, onOlustu }: { akislar: AkisOzeti[]; 
                 <Simge ad="uyari" boyut={16} />
                 <div>
                   <p><b>{MOD_ADI[mod]} modunda kodun ve dokümanların içeriği Claude'a gider.</b> Kurum içi bir sistemse önce kurumunun
-                    politikasına bak. Hiçbir şeyin bu makineden çıkmaması gerekiyorsa Hepsi yerel modunu seç; ya da önce adları ve
-                    verileri anonimleştirilmiş bir kopyayla dene.</p>
-                  <button type="button" className="dugme dugme--ikincil dugme--kucuk" onClick={() => setMod("yerel")}>Hepsi yerel modunu seç</button>
+                    politikasına bak. {modlar.includes("yerel")
+                      ? "Hiçbir şeyin bu makineden çıkmaması gerekiyorsa Hepsi yerel modunu seç; ya da önce adları ve verileri anonimleştirilmiş bir kopyayla dene."
+                      : "Bu uyarı seçimi engellemez; hassas bir sistemse adları ve verileri anonimleştirilmiş bir kopyayla dene. Bu kurulumda yerel mod kapalı."}</p>
+                  {modlar.includes("yerel") && (
+                    <button type="button" className="dugme dugme--ikincil dugme--kucuk" onClick={() => setMod("yerel")}>Hepsi yerel modunu seç</button>
+                  )}
                 </div>
               </div>
             )}

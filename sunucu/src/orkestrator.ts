@@ -41,6 +41,12 @@ const YOKSAY_KLASOR = new Set(["__pycache__", ".pytest_cache", ".git", "node_mod
 const YOKSAY_DOSYA = new Set([".DS_Store", ".coverage"]);
 const YOKSAY_UZANTI = new Set([".pyc", ".pyo", ".log", ".tsbuildinfo"]);
 
+/** Okuma araçları olan her çağrıya: yollar çalışma dizinine göreli. Ajanlar mutlak üst klasöre bakınca CLI reddediyor,
+ *  ajan da "okuma izni yok" deyip kodu hiç okumadan karar veriyordu. */
+const DOSYA_ERISIMI = "Dosya yolları çalışma dizinine göreli: ör. Glob'u `pattern: \"kaynak/**/*.java\"` ile ve `path` vermeden çağır, " +
+  "Read ile `kaynak/...` aç. Üst klasöre (`..`) ya da mutlak bir yola bakma; o çağrılar izinsiz sayılır ve reddedilir. " +
+  "Bir çağrın reddedilirse \"okuma izni yok\" deyip bırakma: aynı şeyi çalışma dizinine göreli bir yolla yeniden dene.";
+
 const ORTAK_KURALLAR = `# Ortak kurallar (her ajan için)
 - Yalnızca sana verilen girdilere ve rolüne dayan. Girdilerde olmayan bilgiyi uydurma.
 - Bir şeyi varsaymak zorundaysan "VARSAYIM:" diye açıkça işaretle.
@@ -520,6 +526,21 @@ export class Orkestrator {
     this.planla(fid);
   }
 
+  /** Fikri siler: klasörü çöp kutusuna taşınır (geri alınabilir). Çalışan ya da sıradaki fikir önce durdurulmalı. */
+  fikirSil(fid: string): string {
+    const f = this.fikirAl(fid);
+    if (f.durum === "calisiyor" || f.durum === "sirada" || this.calisanlar.has(fid) || this.kuyrukListe.includes(fid)) {
+      throw new KovanHatasi("Çalışan bir fikir silinemez; önce durdur.", 409);
+    }
+    return this.depo.fikirKaldir(fid);
+  }
+
+  /** Fikrin klasörü (mutlak yol): belgeler/, kod/, incelemeler/ burada. */
+  fikirKlasoru(fid: string, alt: "" | "kod" | "belgeler" = ""): string {
+    this.fikirAl(fid);
+    return path.join(this.calisma, fid, alt);
+  }
+
   durdur(fid: string): void {
     const f = this.fikirAl(fid);
     if (f.durum === "sirada" || f.durum === "calisiyor") {
@@ -601,6 +622,7 @@ export class Orkestrator {
       aktif_sure_sn: Math.round(adimlar.filter((s) => s.tip !== "sistem").reduce((t, s) => t + (s.sure_sn ?? 0), 0) * 10) / 10,
       ajan_cagrisi: adimlar.filter((s) => AJAN_ADIMI.has(s.tip)).length,
       motor_cagrilari: motorCagrilari,
+      klasor: path.join(this.calisma, fid),
     };
   }
 
@@ -1095,7 +1117,7 @@ export class Orkestrator {
     if (dizinModu) {
       const kilitli = this.kilitOku(fid).yollar;
       const dosyalar = this.kodDosyalari(fid);
-      p.push("", "## Çalışma dizini", "Şu an `kod/` klasöründesin. Bu klasörün dışına çıkma.");
+      p.push("", "## Çalışma dizini", "Şu an `kod/` klasöründesin. Bu klasörün dışına çıkma.", DOSYA_ERISIMI);
       if (asama.salt_okunur) p.push("BU AŞAMA SALT OKUNUR: hiçbir dosya yazma ya da değiştirme. Yaptığın her değişiklik sistemce geri alınır ve ihlal sayılır.");
       if (asama.yazabilir.length) p.push("YAZMA ALANIN (yalnızca buraya yazabilirsin; dışındaki her değişiklik sistemce geri alınır ve ihlal olarak kaydedilir): " + asama.yazabilir.map((y) => `\`${klasorGibi(y)}\``).join(", "));
       if (kilitli.length) p.push("KİLİTLİ (yalnızca okunur; değiştirirsen sistem geri alır ve ihlal olarak kaydeder): " + kilitli.map((k) => `\`${k}\``).join(", "));
@@ -1122,9 +1144,9 @@ export class Orkestrator {
       ...(asama.kalem ? this.kalemBolumu(fid, asama) : []), ...this.kararBolumu(fid), ""];
     if (asama.salt_okunur) {
       p.push("## İncelenen belge", `### ${asama.cikti}`, this.belgeOku(fid, asama.cikti) || "(boş)", "",
-        `Belgedeki iddiaları \`${KAYNAK_KLASORU}/\` altındaki kodla Read, Glob ve Grep kullanarak karşılaştır. Dosya değiştiremezsin.`);
+        `Belgedeki iddiaları \`${KAYNAK_KLASORU}/\` altındaki kodla Read, Glob ve Grep kullanarak karşılaştır. Dosya değiştiremezsin.`, DOSYA_ERISIMI);
     } else if (dizinModu) {
-      p.push("## İncelenen", "Çalışma dizinindeki (`kod/`) dosyaları Read, Glob ve Grep ile oku. Dosya değiştiremezsin.");
+      p.push("## İncelenen", "Çalışma dizinindeki (`kod/`) dosyaları Read, Glob ve Grep ile oku. Dosya değiştiremezsin.", DOSYA_ERISIMI);
       if (asama.yazabilir.length) p.push("Yazarın yazma alanı: " + asama.yazabilir.map((y) => `\`${klasorGibi(y)}\``).join(", "));
       p.push("", "### Yazarın özeti", this.belgeOku(fid, asama.cikti) || "-");
       const sonTest = this.depo.adimlar(fid).filter((s) => s.asama_id === asama.id && s.tip === "kontrol").at(-1);
@@ -1132,7 +1154,7 @@ export class Orkestrator {
     } else {
       p.push("## İncelenen belge", `### ${asama.cikti}`, this.belgeOku(fid, asama.cikti) || "(boş)");
       if (kaynakOkur) {
-        p.push("", `Eski sistemin kodu \`${KAYNAK_KLASORU}/\` altında: belgelerdeki atıfları gerekirse Read, Glob ve Grep ile kodda doğrula. Dosya değiştiremezsin.`);
+        p.push("", `Eski sistemin kodu \`${KAYNAK_KLASORU}/\` altında: belgelerdeki atıfları gerekirse Read, Glob ve Grep ile kodda doğrula. Dosya değiştiremezsin.`, DOSYA_ERISIMI);
       }
     }
     p.push("", "## Referans belgeler");

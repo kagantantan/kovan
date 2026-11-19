@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { api, type DurumYaniti, type FikirDetayi } from "../api";
 import { FIKIR_DURUMU, MOD_ADI, para, sure } from "../bicim";
-import { useYokla } from "../kullan";
+import { git, useYokla } from "../kullan";
 import { DosyaGorunumu } from "./DosyaGorunumu";
 import { GelisimPaneli } from "./GelisimPaneli";
 import { KararPaneli } from "./KararPaneli";
@@ -75,6 +75,20 @@ export function FikirSayfasi({ id, durum, ajanAdlari, onDegisti }: Props) {
                 <Simge ad="oynat" /> Devam ettir
               </button>
             )}
+            <button type="button" className="dugme dugme--ikincil" title={`Bu makinede: ${veri.klasor}`}
+              onClick={() => eylem(() => api.klasorAc(id, veri.dosyalar.kod.length ? "kod" : ""))}>
+              <Simge ad="klasor" /> {veri.dosyalar.kod.length ? "Kodu aç" : "Klasörü aç"}
+            </button>
+            {!calisan && (
+              <button type="button" className="dugme dugme--ikincil" title="Listeden kaldırır; klasörü çöp kutusuna (calisma/.cop/) taşınır"
+                onClick={async () => {
+                  if (!window.confirm(`${f.id} "${f.baslik}" silinsin mi?\n\nListeden kalkar; klasörü calisma/.cop/ altına taşınır, oradan geri alınabilir.`)) return;
+                  setEylemHatasi(null);
+                  try { await api.sil(id); onDegisti(); git("/fikirler"); } catch (e) { setEylemHatasi((e as Error).message); }
+                }}>
+                <Simge ad="cop" /> Sil
+              </button>
+            )}
           </div>
         </div>
         <dl className="olculer">
@@ -107,6 +121,11 @@ export function FikirSayfasi({ id, durum, ajanAdlari, onDegisti }: Props) {
             <div className="butce-cizgi" aria-hidden="true"><span style={{ width: `${doluluk * 100}%` }} /></div>
           </div>
         </dl>
+        <p className="fikir-klasor">
+          Çıktılar bu makinede: <code>{veri.klasor}</code> · ürün kodu <code>kod/</code>, belgeler <code>belgeler/</code>
+          {f.kaynak && <>, mevcut sistemin kilitli kopyası <code>kod/kaynak/</code></>}
+          {veri.adrler.length > 0 && <>, ADR'ler <code>kod/adr/</code></>}
+        </p>
         {eylemHatasi && <p className="hata-satiri" role="alert"><Simge ad="uyari" /> {eylemHatasi}</p>}
       </header>
 

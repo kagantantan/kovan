@@ -1,6 +1,7 @@
 // Fastify sunucusu: derlenmiş arayüz (arayuz/dist) + JSON API. Yalnızca 127.0.0.1'de dinler.
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -58,6 +59,16 @@ export interface KurulumSecenekleri {
   dis_ayar?: string | null;
   /** API anahtarı kasası; verilmezse işletim sisteminin kasası, null ise kasa yok. */
   kasa?: Kasa | null;
+  /** Fikrin klasörünü dosya yöneticisinde açar; testler sahtesini verir. */
+  klasorAcici?: (yol: string) => void;
+}
+
+/** Klasörü işletim sisteminin dosya yöneticisinde açar (Finder, Explorer, xdg-open). Kabuk kullanılmaz. */
+function klasoruAc(yol: string): void {
+  const [komut, args] = process.platform === "darwin" ? ["open", [yol]] : process.platform === "win32" ? ["explorer", [yol]] : ["xdg-open", [yol]];
+  const p = spawn(komut, args as string[], { detached: true, stdio: "ignore" });
+  p.on("error", () => {});
+  p.unref();
 }
 
 export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): Promise<Kovan> {
@@ -206,6 +217,17 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/surum", async (req) => {
     const b = govde(req.body);
     return { id: await ork.yeniSurum(req.params.fid, metin(b.metin)) };
+  });
+
+  app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/sil", async (req) => ({ ok: true, cop: ork.fikirSil(req.params.fid) }));
+
+  app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/klasor-ac", async (req) => {
+    const alt = metin(govde(req.body ?? {}).alt);
+    if (!["", "kod", "belgeler"].includes(alt)) throw new KovanHatasi("alt yalnızca kod ya da belgeler olabilir.");
+    const yol = ork.fikirKlasoru(req.params.fid, alt as "" | "kod" | "belgeler");
+    if (!fs.existsSync(yol)) throw new KovanHatasi(`${alt || "Fikir"} klasörü henüz yok.`, 404);
+    (secenek.klasorAcici ?? klasoruAc)(yol);
+    return { ok: true, yol };
   });
 
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/durdur", async (req) => { ork.durdur(req.params.fid); return { ok: true }; });

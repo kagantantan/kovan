@@ -653,3 +653,6 @@ button.adim-satir:hover { background: var(--duman); }
   .asama-satiri-ic { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .acilir { position: fixed; left: 12px; right: 12px; top: calc(var(--ust) + 6px); width: auto; }
 }
+
+.fikir-klasor { margin: 10px 0 0; font-size: 13px; color: var(--propolis-3); overflow-wrap: anywhere; }
+.fikir-klasor code { font-size: 12.5px; }

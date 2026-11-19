@@ -14,6 +14,8 @@ const YOLLAR: Record<string, ReactElement> = {
   dur: <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />,
   oynat: <path d="M8 5.5v13l10.5-6.5L8 5.5z" />,
   disari: <><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
+  klasor: <path d="M3.5 6.5a1 1 0 0 1 1-1h4.8l2 2h8.2a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z" />,
+  cop: <><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13" /><path d="M10 11v5.5M14 11v5.5" /></>,
   dosya: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /></>,
   insan: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
   uyari: <><path d="M12 3.5L2.5 20h19L12 3.5z" /><path d="M12 10v4.5M12 17.5h.01" /></>,

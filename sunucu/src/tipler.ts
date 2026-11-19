@@ -259,6 +259,7 @@ export interface DosyaBilgisi {
 
 export interface FikirDetayi {
   fikir: Fikir;
+  klasor: string;        // fikrin bu makinedeki klasörü: belgeler/, kod/ (ürün), incelemeler/
   akis_ad: string;
   asamalar: AsamaGorunumu[];
   adimlar: Adim[];

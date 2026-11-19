@@ -8,6 +8,9 @@ import { atomikYaz, jsonOku, simdi } from "./ortak.js";
 import type { Adim, Fikir, FikirDurumu } from "./tipler.js";
 export type { Adim, AdimTipi, AjanSorusu, Bekleme, BeklemeSebebi, Fikir, FikirDurumu, Secenek } from "./tipler.js";
 
+/** Silinen fikirlerin klasörü (calisma/.cop/F-004-20261119...). */
+export const COP_KLASORU = ".cop";
+
 export class Depo {
   private fikirMap = new Map<string, Fikir>();
   private adimMap = new Map<string, Adim[]>();
@@ -35,6 +38,9 @@ export class Depo {
   yeniId(): string {
     let enBuyuk = 0;
     for (const id of this.fikirMap.keys()) enBuyuk = Math.max(enBuyuk, Number(id.split("-").pop()) || 0);
+    // Silinen fikirlerin numarası yeniden kullanılmaz: çöp kutusundaki F-004-... de sayılır
+    const cop = path.join(this.calisma, COP_KLASORU);
+    if (fs.existsSync(cop)) for (const ad of fs.readdirSync(cop)) enBuyuk = Math.max(enBuyuk, Number(/^F-(\d+)/.exec(ad)?.[1]) || 0);
     return `F-${String(enBuyuk + 1).padStart(3, "0")}`;
   }
 
@@ -42,6 +48,17 @@ export class Depo {
     this.fikirMap.set(f.id, f);
     this.adimMap.set(f.id, []);
     this.kaydet(f.id);
+  }
+
+  /** Fikri listeden çıkarır ve klasörünü çöp kutusuna (calisma/.cop/) taşır; kalıcı silme yok, elle geri taşınabilir. */
+  fikirKaldir(fid: string): string {
+    if (!this.fikirMap.has(fid)) throw new Error(`Fikir yok: ${fid}`);
+    const hedef = path.join(this.calisma, COP_KLASORU, `${fid}-${simdi().replace(/[^0-9]/g, "").slice(0, 14)}`);
+    fs.mkdirSync(path.dirname(hedef), { recursive: true });
+    fs.renameSync(path.join(this.calisma, fid), hedef);
+    this.fikirMap.delete(fid);
+    this.adimMap.delete(fid);
+    return hedef;
   }
 
   fikir(fid: string): Fikir | undefined {

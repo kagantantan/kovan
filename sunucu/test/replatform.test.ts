@@ -149,6 +149,10 @@ describe("Replatform akışı", () => {
     expect(msIstem).toContain("## Mevcut sistem\nBu iş bir replatform");
     expect(msIstem).toContain("`kaynak/` altında (5 dosya): salt okunur ve kilitli");
     expect(msIstem).toContain("BU AŞAMA SALT OKUNUR");
+    // Okuma araçları olan üretici de onaycılar da göreli yolla okumaya yönlendirilir (mutlak üst klasör CLI'da reddediliyordu)
+    for (const a of ms.filter((x) => x.tip === "uret" || x.tip === "inceleme")) {
+      expect(istemi(k, fid, a.id)).toContain("`pattern: \"kaynak/**/*.java\"` ile ve `path` vermeden");
+    }
     const analiz = dosya(k, fid, "belgeler/mevcut-sistem.md");
     expect(analiz).toContain(`FARK: Gün esası: doküman 360 diyor, kod 365 kullanıyor. ${PKB}:5`);
     expect(analiz).toContain(`E2: Sıfır ya da alacaklı bakiyeye faiz işlemez. ${PKB}:10-12`);

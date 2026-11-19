@@ -1,6 +1,7 @@
 // HTTP katmanı: host ve köken denetimi, hata kodları, dosya erişim sınırları, önizleme yalıtımı,
 // karar ve cevap uç noktaları; karar ve cevap doğrulamaları.
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
 import path from "node:path";
 import { KOK, bekle, bekliyor, kovanOlustur, ORNEK_MINI } from "./yardimci/ortam.js";
 
@@ -21,6 +22,37 @@ describe("HTTP sunucusu", () => {
     const ok = await app.inject({ method: "POST", url: "/api/fikirler", headers: { ...HOST, origin: "http://127.0.0.1:8765" }, payload: govde });
     expect(ok.statusCode).toBe(200);
     expect(ok.json().id).toBe("F-001");
+  });
+
+  it("fikir silinir: klasörü çöp kutusuna taşınır, numarası yeniden kullanılmaz; çalışan fikir silinmez", async () => {
+    const acilan: string[] = [];
+    const k = await kovanOlustur({ ayar: { ajan_sorulari: false }, klasorAcici: (y) => acilan.push(y) });
+    const post = (url: string, payload: object = {}) => k.app.inject({ method: "POST", url, headers: HOST, payload });
+    const fid = await k.ork.yeniFikir("", ORNEK_MINI, "mini", "deneme");
+    // Çalışırken silinmez
+    expect((await post(`/api/fikirler/${fid}/sil`)).statusCode).toBe(409);
+    await bekle(k, fid, bekliyor("insan"));
+
+    // Klasör: detayda yol var; kod/ dosya yöneticisinde açılır, yalnızca izinli alt klasör
+    const d = (await k.app.inject({ url: `/api/fikirler/${fid}`, headers: HOST })).json();
+    expect(d.klasor).toBe(path.join(k.kok, "calisma", fid));
+    expect((await post(`/api/fikirler/${fid}/klasor-ac`, { alt: "kod" })).json().yol).toBe(path.join(k.kok, "calisma", fid, "kod"));
+    expect(acilan).toEqual([path.join(k.kok, "calisma", fid, "kod")]);
+    expect((await post(`/api/fikirler/${fid}/klasor-ac`, { alt: "../.." })).statusCode).toBe(400);
+    expect((await post("/api/fikirler/F-999/klasor-ac")).statusCode).toBe(404);
+    // Başka kökenden silinemez
+    expect((await k.app.inject({ method: "POST", url: `/api/fikirler/${fid}/sil`, headers: { ...HOST, origin: "https://kotu.example" } })).statusCode).toBe(403);
+
+    const r = await post(`/api/fikirler/${fid}/sil`);
+    expect(r.statusCode).toBe(200);
+    expect(r.json().cop).toMatch(new RegExp(`calisma/\\.cop/${fid}-\\d{14}$`));
+    expect(fs.existsSync(path.join(r.json().cop, ".kovan", "fikir.json"))).toBe(true);
+    expect(fs.existsSync(path.join(k.kok, "calisma", fid))).toBe(false);
+    expect((await k.app.inject({ url: "/api/fikirler", headers: HOST })).json()).toEqual([]);
+    expect((await k.app.inject({ url: `/api/fikirler/${fid}`, headers: HOST })).statusCode).toBe(404);
+    expect((await post(`/api/fikirler/${fid}/sil`)).statusCode).toBe(404);
+    // Yeni fikir silinenin numarasını almaz
+    expect(await k.ork.yeniFikir("", ORNEK_MINI, "mini", "deneme")).toBe("F-002");
   });
 
   it("anlaşılır 400/404 hataları döner", async () => {
