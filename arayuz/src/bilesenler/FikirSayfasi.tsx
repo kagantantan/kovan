@@ -1,6 +1,6 @@
 // Bir fikrin sayfası: başlık ve ölçüler, petek şeridi, karar yuvası, zaman çizelgesi ve dosyalar.
 import { useMemo, useState } from "react";
-import { api, type DurumYaniti, type FikirDetayi } from "../api";
+import { api, type DurumYaniti, type FikirDetayi, type Mod } from "../api";
 import { FIKIR_DURUMU, MOD_ADI, para, sure } from "../bicim";
 import { git, useYokla } from "../kullan";
 import { DosyaGorunumu } from "./DosyaGorunumu";
@@ -96,7 +96,14 @@ export function FikirSayfasi({ id, durum, ajanAdlari, onDegisti }: Props) {
           <div className="olcu"><dt>Akış</dt><dd>{veri.akis_ad}
             {(f.surum ?? 1) > 1 && <span className="olcu-ek"> sürüm {f.surum}{f.temel_fikir ? <>, <a href={`#/fikirler/${f.temel_fikir}`}>{f.temel_fikir}</a> üzerine</> : null}</span>}
           </dd></div>
-          <div className="olcu"><dt>Mod</dt><dd>{MOD_ADI[f.motor]}</dd></div>
+          <div className="olcu"><dt>Mod</dt><dd>
+            {calisan || !durum ? MOD_ADI[f.motor] : (
+              <select className="olcu-secim" value={f.motor} aria-label="Mod" title="Sonraki ajan çağrıları seçilen modda çalışır"
+                onChange={(e) => eylem(() => api.modDegistir(id, e.target.value as Mod))}>
+                {durum.modlar.map((m) => <option key={m} value={m}>{MOD_ADI[m]}</option>)}
+              </select>
+            )}
+          </dd></div>
           {f.kaynak && (
             <div className="olcu" title={`Kilitli, salt okunur kopya. Alındığı yer: ${f.kaynak.yollar.join(", ")}`}>
               <dt>Mevcut sistem</dt>

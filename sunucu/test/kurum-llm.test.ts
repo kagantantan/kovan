@@ -64,6 +64,14 @@ function istek(cwd: string, ek: Partial<DonguIstegi> = {}): DonguIstegi {
 
 // ------------------------------------------------------------------------------------------
 describe("Ajan döngüsü", () => {
+  it("bağlama sığmayan istemi sunucuya göndermeden kalıcı hatayla durur (Ollama sessizce kırpardı)", async () => {
+    const s = await sahteSunucu(() => yanit({ content: "olmamalı" }));
+    const r = await ajanDongusu(baglanti(s.adres, { baglam_token: 8_192 }), istek(gecici(), { istem: "ç".repeat(30_000) }));
+    expect(r).toMatchObject({ ok: false, kalici_hata: true });
+    expect(r.hata).toMatch(/^İstem modelin bağlamına sığmıyor: yaklaşık 11\.\d{3} token, bağlam 8\.192\./);
+    expect(s.istekler).toHaveLength(0);
+  });
+
   it("araç çağırır, sonucu modele verir; araç çağırmadan verilen yanıt ajanın çıktısıdır", async () => {
     const s = await sahteSunucu((g, n) => n === 1 ? yanit({ tool_calls: [cagri("Write", { file_path: "notlar/a.txt", content: "merhaba\ndünya" })] })
       : n === 2 ? yanit({ tool_calls: [cagri("Read", { file_path: "notlar/a.txt" })] })

@@ -55,6 +55,20 @@ describe("HTTP sunucusu", () => {
     expect(await k.ork.yeniFikir("", ORNEK_MINI, "mini", "deneme")).toBe("F-002");
   });
 
+  it("kaynak yolu seçim penceresinden gelir; iptal boş liste, başka kökenden istek reddedilir", async () => {
+    const istenen: string[] = [];
+    let cevap: string[] | null = ["/Users/sen/eski/gunsonu", "/Users/sen/analiz.docx"];
+    const k = await kovanOlustur({ yolSecici: async (tur) => { istenen.push(tur); return cevap; } });
+    const sec = (payload: object, origin?: string) => k.app.inject({ method: "POST", url: "/api/yol-sec", headers: { ...HOST, ...(origin ? { origin } : {}) }, payload });
+    expect((await sec({ tur: "klasor" })).json()).toEqual({ yollar: ["/Users/sen/eski/gunsonu", "/Users/sen/analiz.docx"] });
+    cevap = null;
+    expect((await sec({ tur: "dosya" })).json()).toEqual({ yollar: [] });
+    expect((await sec({ tur: "uydurma" })).statusCode).toBe(200);
+    expect(istenen).toEqual(["klasor", "dosya", "klasor"]);
+    expect((await sec({ tur: "klasor" }, "https://kotu.example")).statusCode).toBe(403);
+    expect(istenen).toHaveLength(3);
+  });
+
   it("anlaşılır 400/404 hataları döner", async () => {
     const { app } = await kovanOlustur();
     const bos = await app.inject({ method: "POST", url: "/api/fikirler", headers: HOST, payload: { metin: "  ", profil: "mini", motor: "deneme" } });
@@ -124,7 +138,7 @@ describe("Replatform uç noktaları", () => {
     const k = await kovanOlustur();
     const post = (payload: object) => k.app.inject({ method: "POST", url: "/api/fikirler", headers: HOST, payload });
     const durum = (await k.app.inject({ url: "/api/durum", headers: HOST })).json();
-    expect(durum.hedef_yiginlar.map((h: { id: string }) => h.id)).toEqual(["node-ts", "java21-spring-maven", "java25-spring-maven", "java21-temporal", "java17-spring-batch"]);
+    expect(durum.hedef_yiginlar.map((h: { id: string }) => h.id)).toEqual(["node-ts", "java21-spring-maven", "java25-spring-maven", "java21-temporal", "java17-spring-batch", "java17-spring-rest"]);
     expect(durum.yerel_motor).toBe("qwen-yerel");
     expect(durum.ornek_kaynak).toBeNull();                        // geçici kökte ornekler/ yok
     const akislar = (await k.app.inject({ url: "/api/akislar", headers: HOST })).json();

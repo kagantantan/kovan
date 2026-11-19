@@ -35,6 +35,9 @@ const yolu = (id: string) => `/api/fikirler/${encodeURIComponent(id)}`;
 export const api = {
   durum: () => istek<DurumYaniti>("/api/durum"),
   ajanlar: () => istek<AjanOzeti[]>("/api/ajanlar"),
+  ajanSecimi: (id: string, motor: string, model: string) => istek<{ ok: true }>(`/api/ajanlar/${encodeURIComponent(id)}/secim`, { motor, model }),
+  ajanSecimiSil: (id: string) => istek<{ ok: true }>(`/api/ajanlar/${encodeURIComponent(id)}/secim-sil`, {}),
+  modeller: () => istek<Record<string, string[]>>("/api/motorlar/modeller"),
   akislar: () => istek<AkisOzeti[]>("/api/akislar"),
   fikirler: () => istek<FikirOzeti[]>("/api/fikirler"),
   fikir: (id: string) => istek<FikirDetayi>(yolu(id)),
@@ -45,6 +48,8 @@ export const api = {
   cevap: (id: string, cevaplar: Cevap[]) => istek<{ ok: true }>(`${yolu(id)}/cevap`, { cevaplar }),
   durdur: (id: string) => istek<{ ok: true }>(`${yolu(id)}/durdur`, {}),
   devam: (id: string) => istek<{ ok: true }>(`${yolu(id)}/devam`, {}),
+  modDegistir: (id: string, mod: Mod) => istek<{ ok: true }>(`${yolu(id)}/mod`, { mod }),
+  yolSec: (tur: "klasor" | "dosya") => istek<{ yollar: string[] }>("/api/yol-sec", { tur }),
   sil: (id: string) => istek<{ ok: true; cop: string }>(`${yolu(id)}/sil`, {}),
   klasorAc: (id: string, alt: "" | "kod" | "belgeler" = "") => istek<{ ok: true; yol: string }>(`${yolu(id)}/klasor-ac`, { alt }),
   yeniSurum: (id: string, metin: string) => istek<{ id: string }>(`${yolu(id)}/surum`, { metin }),

@@ -437,7 +437,7 @@ Var olan bir sistemi (PL/SQL, COBOL, Java, C...) analiz dokümanıyla birlikte v
 ![Doküman ile kod farkı: ekip bölündü, karar sende](docs/replatform-soru.png)
 
 ### Kaynakları vermek
-Yeni fikirde **Replatform** akışını seç; **Mevcut sistem** alanına bu makinedeki klasör, `.zip` ya da dosya yollarını satır satır yaz. Kovan:
+Yeni fikirde **Replatform** akışını seç; **Mevcut sistem** alanında **Klasör seç** ya da **Dosya seç** ile Finder'dan seç (birden çok seçilebilir; Linux'ta `zenity` gerekir) ya da yolları satır satır yaz. Klasör, `.zip` ve tek tek dosyalar kabul edilir. Kovan:
 - kopyasını fikrin `kod/kaynak/` klasörüne alır, aslına dokunmaz; kopyayı **kilitler** (SHA-256). Ajanlar yalnızca okur; değiştiren olursa sistem geri alır ve sınır ihlali yazar;
 - `.git`, `node_modules`, `target`, `build` gibi klasörleri ve ikili dosyaları (`.jar`, `.class`, `.dmp`...) almaz;
 - Word belgelerini (`.docx`) tablolarıyla HTML'e çevirir; her paragraf ve tablo satırı ayrı satırdadır, belgeye de satır atfı verilebilir. Eski `.doc` ve `.xls` okunamaz, envantere not düşer;
@@ -464,7 +464,7 @@ Yeni fikirde **Replatform** akışını seç; **Mevcut sistem** alanına bu maki
 - **Uydurma atıf geri döner.** Mevcut sistem analizindeki her atfı sistem denetler: dosya var mı, o satırlar var mı. Atıfsız ya da uydurma atıflı analiz onay kuruluna gitmeden düzeltmeye döner. Belgelerdeki atıflar tıklanır: eski sistemin o satırları **Mevcut sistem** sekmesinde vurgulanarak açılır, iddiayı kodla yan yana doğrularsın.
 - **Farklar karara bağlanır.** Doküman gün esasını 360, kod 365 diyorsa bu bir FARK'tır. Hedef analizde hangisinin geçerli olduğunu ekip oylar; anlaşamazsa soru oylarla sana gelir. Üretimdeki davranışı değiştiren her karar karar defterinde kalır.
 - **Eşdeğerlik ayrı bir onay.** MSA, hedef analizden koda kadar her aşamada "korunan kural eskisiyle aynı mı davranıyor?" diye bakar: yuvarlama, gün sayımı, sıralama, boş ve negatif durumlar.
-- **Batch mı, endpoint mi kararı ADR'dir.** Eski sistemin her giriş noktası (zamanlanmış iş, ekrandan ya da başka sistemden çağrı) için Mimar `calisma_bicimi` ADR'si yazar; batch step'i de endpoint de aynı saf domain servisini çağırır, kural iki yerde yazılmaz.
+- **Batch mı, endpoint mi kararı ADR'dir.** Hedef yığını sen seçersin (Batch ya da REST); seçmediysen ya da eski sistemde ikisi birden varsa, eski sistemin her giriş noktası (zamanlanmış iş, ekrandan ya da başka sistemden çağrı) için Mimar `calisma_bicimi` ADR'si yazar; batch step'i de endpoint de aynı saf domain servisini çağırır, kural iki yerde yazılmaz.
 - **Altın test.** `kaynak/` altında eski sistemin örnek girdisi ve çıktısı varsa (ör. `girdi.csv`, `beklenen.csv`), birleştirme yeni kodu onunla koşar ve sonucu satır satır karşılaştırır. Anonimleştirilmiş birkaç günlük örnek koyman en güçlü güvencedir.
 
 ![Analizdeki atfa tıklayınca eski sistemin satırları açılır](docs/replatform-atif.png)
@@ -477,7 +477,8 @@ Yeni fikirde seçersen karar defterine yazılır ve bütün ajanlar ona uyar. Se
 | Java 21 + Spring Boot (Maven) | yaygın LTS; para ve oran BigDecimal, iş mantığı saf domain'de (hexagonal) |
 | Java 25 + Spring Boot (Maven) | yeni LTS'e geçtiysen |
 | Java 21 + Spring Boot + Temporal | iş uzun, çok adımlı ve kesintide kaldığı yerden sürmesi gerekiyorsa |
-| Java 17 + Spring Batch / REST (Oracle) | milyonlarca kayıtlı gün sonu işi ya da çevrim içi servis; her giriş noktasının batch mı endpoint mi olacağını mimar ADR ile seçer; chunk, partitioning ve yeniden başlatma kararlarını rakamla verir |
+| Java 17 + Spring Batch (Oracle) | milyonlarca kayıtlı gün sonu işi; chunk, partitioning ve yeniden başlatma kararlarını mimar rakamla verir |
+| Java 17 + Spring Boot REST (Oracle) | çevrim içi servis: DTO, doğrulama, hata biçimi, idempotency, MockMvc testleri |
 | Node.js + TypeScript | Kovan'ın varsayılanı |
 | Başka bir yığın | serbest metin, ör. "Java 17 + Spring Boot 3, Gradle" |
 
@@ -544,6 +545,16 @@ Tekrar çalıştırmak güvenlidir; kurulu olanı yeniden kurmaz. Model seçimin
 | 32 GB ve üstü | `qwen3-coder:30b` (MoE, hızlı; varsayılan) |
 | 16-24 GB | `qwen3.5:9b` (küçük; basit kalemlerde iş görür, zor kalemde "Claude'a devret") |
 | 16 GB altı | Yerel ajan kodlaması zayıf kalır. **Hepsi Claude** modunu öneririm. |
+
+**Kovan'ın kendi ajan döngüsüyle (OpenAI uyumlu yol).** Ollama'yı `claude` CLI'ı yerine, bankadaki kurum LLM'iyle aynı yoldan da bağlayabilirsin. Bu Claude Code gerektirmez ve kurum ortamının provasıdır:
+
+```yaml
+yerel_motor: qwen-yerel
+motorlar:
+  qwen-yerel: { tur: openai, adres: http://127.0.0.1:11434/v1, model: qwen3:8b, baglam_token: 32768 }
+```
+
+Ollama'yı bağlamı büyüterek başlat: `OLLAMA_CONTEXT_LENGTH=32768 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve`. 16 GB'lık bir Mac'te 8-9B model ve 32k bağlam sığar; büyük replatform belgeleri bu bağlamı aşabilir, küçük işlerle başla.
 
 Ollama değişkenlerini (`ANTHROPIC_BASE_URL` vb.) `~/.zshrc`'ye ya da `~/.claude/settings.json`'a yazma. Kovan bunları yalnızca yerel ajanların çağrısına koyar, Claude ajanları için temizler. `settings.json`'daki değerler ise Kovan'ın ayarını ezer.
 
@@ -660,6 +671,14 @@ Dış dosyada yazdığın her üst anahtar repodaki `kovan.yaml`'ın aynı anaht
 
 ## Ekip ve onay kurulları
 
+### Ajan başına motor ve model
+
+**Ajanlar** ekranında her ajanın altında **Motor** (Claude ya da `kovan.yaml`'daki bir motor, ör. `qwen-yerel`) ve **Model** (Claude: `sonnet`, `opus`, `haiku`; Ollama: sunucudaki modeller listelenir) seçilir. **Kaydet** sonraki ajan çağrısından itibaren geçerlidir; **Varsayılana dön** kartın değerine döner.
+
+- Seçim **Hibrit** modda geçerlidir. **Hepsi Claude** ve **Hepsi yerel** bütün ajanları tek motora alır.
+- Sıra: kart (`ajanlar/*.md`) < dış ayar (`ajanlar:`) < ekran seçimi. Yalnızca motor ve model değişir; araçlar, izinler ve sistem istemi kartta kalır.
+- Seçimler repo dışında, `~/.kovan/ajan-secimleri.json`'da durur (`KOVAN_AJAN_SECIMLERI` ile başka bir yol).
+
 | Ajan | Motor | Üretir | Onay kurullarında | Ortak kararda |
 |---|---|---|---|---|
 | Ürün Sahibi (PO) | Claude | kapsam ve kabul paketi, gelişim önerileri | analiz, UX, teslim planı, test senaryoları, teslim paketi | oy verir |
@@ -737,6 +756,7 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 | "Node.js eski" | [nodejs.org](https://nodejs.org)'dan LTS sürümünü (22+) kur |
 | "Paket kurulumu başarısız" | İnternet bağlantını kontrol et; Terminal'de `npm install` çalıştırıp hatayı gör |
 | "Çalışan bir fikir silinemez; önce durdur." | Fikir ekranında **Durdur**, sonra **Sil** |
+| "İstem modelin bağlamına sığmıyor" | Yerel ya da kurum modelinin bağlamı bu aşamanın girdisine yetmiyor; Kovan istemi kırptırmak yerine durdu. Daha büyük bağlamlı model kullan (motor ayarında `baglam_token`'ı da güncelle) ya da aşamayı Hibrit modda Claude'a ver |
 | "Belge bütünlüğü: GEÇERSİZ" | Ajan revizyonda belgeyi kısmen ya da baştan yazdı; önceki sürüm geri kondu, bulgu ajana döndü. Genelde sonraki turda düzelir |
 | "ADR biçimi: GEÇERSİZ" | Mimar'ın `kovan-adr` bloğu eksik ya da bozuk; sistem bulguyu mimara geri gönderir, genelde bir sonraki turda düzelir. Tur sınırına gelirse bulgulardaki maddeye bak (ör. "en az iki seçenek olmalı", "'calisma_bicimi' alanında bir ADR yok") |
 | "Port 8765 kullanımda" | Kovan zaten açık olabilir; değilse `kovan.yaml`'da `port`'u değiştir |

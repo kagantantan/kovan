@@ -12,6 +12,7 @@ import { kartAyarlariniUygula, kartOzeti, kartlariYukle } from "./kartlar.js";
 import { ClaudeMotoru, DenemeMotoru, OllamaMotoru, type Motor } from "./motor.js";
 import { sistemKasasi, type Kasa } from "./kasa.js";
 import { UyumluMotor } from "./uyumlu.js";
+import { AjanSecimleri, varsayilanSecimDosyasi } from "./secimler.js";
 import { Orkestrator, type Cevap } from "./orkestrator.js";
 import { KovanHatasi } from "./ortak.js";
 import type { AjanOzeti, DurumYaniti } from "./tipler.js";
@@ -61,6 +62,30 @@ export interface KurulumSecenekleri {
   kasa?: Kasa | null;
   /** Fikrin klasörünü dosya yöneticisinde açar; testler sahtesini verir. */
   klasorAcici?: (yol: string) => void;
+  /** Kaynak yolu seçimi için işletim sisteminin seçim penceresi; testler sahtesini verir. null: iptal. */
+  yolSecici?: (tur: "klasor" | "dosya") => Promise<string[] | null>;
+  /** Ajanlar ekranındaki motor ve model seçimlerinin dosyası; verilmezse ~/.kovan/ajan-secimleri.json, null ise yalnızca bellek. */
+  ajan_secimleri?: string | null;
+}
+
+/** İşletim sisteminin seçim penceresini açar (macOS: Finder, Linux: zenity). Seçilen mutlak yollar; iptalde null. Kabuk kullanılmaz. */
+function yolSec(tur: "klasor" | "dosya"): Promise<string[] | null> {
+  const [komut, args]: [string, string[]] = process.platform === "darwin"
+    ? ["osascript", ["-e", tur === "klasor"
+      ? 'set y to choose folder with prompt "Mevcut sistemin klasörünü seç" with multiple selections allowed'
+      : 'set y to choose file with prompt "Mevcut sistemin dosyalarını seç" with multiple selections allowed',
+    "-e", 'set s to ""', "-e", "repeat with i in y", "-e", "set s to s & POSIX path of i & linefeed", "-e", "end repeat", "-e", "return s"]]
+    : process.platform === "linux"
+      ? ["zenity", ["--file-selection", "--multiple", "--separator=\n", ...(tur === "klasor" ? ["--directory"] : [])]]
+      : ["", []];
+  if (!komut) return Promise.reject(new KovanHatasi("Bu işletim sisteminde seçim penceresi yok; yolu elle yaz.", 501));
+  return new Promise((coz, red) => {
+    let cikti = "";
+    const p = spawn(komut, args, { stdio: ["ignore", "pipe", "ignore"] });
+    p.stdout!.setEncoding("utf8").on("data", (x) => { cikti += x; });
+    p.on("error", () => red(new KovanHatasi(`Seçim penceresi açılamadı (${komut} yok); yolu elle yaz.`, 501)));
+    p.on("close", (kod) => coz(kod === 0 ? cikti.split("\n").map((y) => y.trim().replace(/(.)\/$/, "$1")).filter(Boolean) : null));
+  });
 }
 
 /** Klasörü işletim sisteminin dosya yöneticisinde açar (Finder, Explorer, xdg-open). Kabuk kullanılmaz. */
@@ -87,6 +112,8 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     ...Object.entries(cfg.motorlar).map(([ad, m]): [string, Motor] =>
       [ad, m.tur === "openai" ? new UyumluMotor(ad, m, kasa) : new OllamaMotoru(ad, m.adres, m.model, cfg.claude_yolu)]),
   ]);
+  const secimler = new AjanSecimleri(kartlar, () => [...motorlar.keys()].filter((m) => m !== "deneme"),
+    secenek.ajan_secimleri === undefined ? varsayilanSecimDosyasi() : secenek.ajan_secimleri);
   const depo = new Depo(calisma);
   const ork = new Orkestrator(calisma, cfg, depo, kartlar, akislar, motorlar);
 
@@ -161,12 +188,32 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
   });
   app.post<{ Params: { ad: string } }>("/api/motorlar/:ad/dene", async (req) => baglantiSonucu(uyumluMotor(req.params.ad)));
 
+  // Ajanlar ekranı: ajanın motoru ve modeli (Hibrit modda geçerli; Hepsi Claude ve Hepsi yerel modları hepsini tek motora alır)
+  app.post<{ Params: { id: string } }>("/api/ajanlar/:id/secim", async (req) => {
+    const g = govde(req.body);
+    secimler.ayarla(req.params.id, { motor: metin(g.motor), model: metin(g.model) });
+    return { ok: true };
+  });
+  app.post<{ Params: { id: string } }>("/api/ajanlar/:id/secim-sil", async (req) => { secimler.kaldir(req.params.id); return { ok: true }; });
+  // Seçim ekranı için öneri listesi: Claude takma adları ve OpenAI uyumlu motorların sunucudaki modelleri
+  app.get("/api/motorlar/modeller", async () => {
+    const sonuc: Record<string, string[]> = {};
+    for (const [ad, m] of motorlar) {
+      if (ad === "deneme") continue;
+      if (m instanceof UyumluMotor) { await m.saglik(true).catch(() => false); sonuc[ad] = m.modeller.slice(0, 50); }
+      else if (ad === "claude") sonuc[ad] = ["sonnet", "opus", "haiku"];
+      else sonuc[ad] = [m.modelSec({ yerel_model: null } as never)];
+    }
+    return sonuc;
+  });
+
   app.get("/api/ajanlar", async () => [...kartlar.values()].map((k): AjanOzeti => {
     const m = motorlar.get(k.motor);
     return {
       ...kartOzeti(k),
       motor_modeli: m ? m.modelSec(k) : k.model,
       motor_yerel: Boolean(m?.yerel),
+      secim: secimler.secim(k.id),
       uretir: [...akislar.values()].flatMap((ak) => tumAdimlar(ak)
         .filter((a) => a.ajan === k.id || (a.ajan === "{gelistirici}" && ak.asamalar.some((s) => k.id in s.gelistiriciler)))
         .map((a) => `${a.ad} (${ak.ad})`)),
@@ -219,6 +266,12 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     return { id: await ork.yeniSurum(req.params.fid, metin(b.metin)) };
   });
 
+  // Yeni fikir: mevcut sistemin klasörünü ya da dosyalarını Finder'dan seç (tarayıcı tam yolu veremez)
+  app.post("/api/yol-sec", async (req) => {
+    const tur = metin(govde(req.body).tur) === "dosya" ? "dosya" : "klasor";
+    return { yollar: (await (secenek.yolSecici ?? yolSec)(tur)) ?? [] };
+  });
+
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/sil", async (req) => ({ ok: true, cop: ork.fikirSil(req.params.fid) }));
 
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/klasor-ac", async (req) => {
@@ -228,6 +281,11 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     if (!fs.existsSync(yol)) throw new KovanHatasi(`${alt || "Fikir"} klasörü henüz yok.`, 404);
     (secenek.klasorAcici ?? klasoruAc)(yol);
     return { ok: true, yol };
+  });
+
+  app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/mod", async (req) => {
+    ork.modDegistir(req.params.fid, metin(govde(req.body).mod));
+    return { ok: true };
   });
 
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/durdur", async (req) => { ork.durdur(req.params.fid); return { ok: true }; });

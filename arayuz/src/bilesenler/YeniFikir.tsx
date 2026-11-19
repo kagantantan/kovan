@@ -42,6 +42,7 @@ export function YeniFikir({ akislar, durum, onOlustu }: { akislar: AkisOzeti[]; 
   const [hedef, setHedef] = useState("");
   const [ozelHedef, setOzelHedef] = useState("");
   const [gonderiliyor, setGonderiliyor] = useState(false);
+  const [seciliyor, setSeciliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
 
   useEffect(() => { if (!profil && akislar[0]) setProfil(akislar[0].id); }, [akislar, profil]);
@@ -145,6 +146,22 @@ export function YeniFikir({ akislar, durum, onOlustu }: { akislar: AkisOzeti[]; 
               <textarea rows={3} className="girdi--kod" value={kaynaklar} onChange={(e) => setKaynaklar(e.target.value)} required spellCheck={false}
                 placeholder={"/Users/sen/eski-sistem/gunsonu\n/Users/sen/Belgeler/reeskont-analiz.docx"} />
             </label>
+            <div className="yol-sec">
+              {(["klasor", "dosya"] as const).map((tur) => (
+                <button key={tur} type="button" className="dugme dugme--ikincil dugme--kucuk" disabled={seciliyor}
+                  onClick={async () => {
+                    setSeciliyor(true); setHata(null);
+                    try {
+                      const { yollar } = await api.yolSec(tur);
+                      if (yollar.length) setKaynaklar((k) => [...new Set([...k.split("\n").map((y) => y.trim()).filter(Boolean), ...yollar])].join("\n"));
+                    } catch (e) { setHata((e as Error).message); }
+                    setSeciliyor(false);
+                  }}>
+                  <Simge ad={tur === "klasor" ? "klasor" : "dosya"} boyut={14} /> {tur === "klasor" ? "Klasör seç" : "Dosya seç"}
+                </button>
+              ))}
+              {seciliyor && <span className="alan-ipucu">Finder penceresi açıldı; seçimini bekliyorum...</span>}
+            </div>
             <p className="alan-not">
               Kod ve analiz dokümanı birlikte. Kopyası alınır, aslına dokunulmaz; kopya kilitlenir, ajanlar yalnızca okur.
               .git, node_modules, target ve ikili dosyalar alınmaz. Word belgeleri HTML'e, Windows-1254 ve UTF-16 dosyalar UTF-8'e çevrilir.

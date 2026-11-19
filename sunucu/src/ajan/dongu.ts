@@ -256,6 +256,14 @@ export async function ajanDongusu(b: BaglantiAyari, i: DonguIstegi, secenek: { s
     { role: "system", content: sistemMetni(i, araclar, bicim === "metin") },
     { role: "user", content: i.istem },
   ];
+  // İlk istem bağlama sığmıyorsa sunucu (ör. Ollama) onu sessizce kırpar ve model yarım girdiyle çalışır.
+  // Kaba tahmin: Türkçe metinde yaklaşık 2,6 karakter = 1 token. Sığmıyorsa çağırmadan, anlaşılır bir hatayla dur.
+  const tahmini = Math.ceil((mesajlar[0].content.length + mesajlar[1].content.length) / 2.6);
+  if (tahmini > b.baglam_token * 0.9) {
+    return Object.assign(sonuc, { kalici_hata: true, hata: `İstem modelin bağlamına sığmıyor: yaklaşık ${tahmini.toLocaleString("tr-TR")} token, ` +
+      `bağlam ${b.baglam_token.toLocaleString("tr-TR")}. Sunucu istemi kırpardı ve model girdinin bir kısmını görmezdi. Daha büyük bağlamlı bir model ` +
+      "(ve motor ayarında baglam_token) kullan ya da bu aşamayı Hibrit modda Claude'a ver." });
+  }
   const sinirKarakter = Math.max(20_000, Math.floor(b.baglam_token * 3 * 0.7));
   const bitir = (alanlar: Partial<DonguSonucu>) => Object.assign(sonuc, { arac_bicimi: bicim }, alanlar);
 

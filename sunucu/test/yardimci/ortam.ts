@@ -51,7 +51,7 @@ export class SahteMotor implements Motor {
   }
 
   async saglik(): Promise<boolean> { return this.hazir; }
-  modelSec(kart: AjanKarti): string { return this.yerel ? "qwen-sahte" : kart.model; }
+  modelSec(kart: AjanKarti): string { return this.yerel ? kart.yerel_model ?? "qwen-sahte" : kart.model; }   // gerçek yerel motorlar gibi
   async durumOzeti(): Promise<MotorDurumu> {
     return { hazir: this.hazir, surum: this.surum, hata: this.hata, yol: null, tur: this.tur, yerel: this.yerel, model: this.yerel ? "qwen-sahte" : null };
   }
@@ -119,7 +119,7 @@ export interface TestKovani extends Kovan {
  * dis_ayar: geliştiricinin kabuğundaki KOVAN_AYAR testlere sızmasın diye varsayılan null.
  * kasa: varsayılan null; işletim sisteminin anahtar kasası hiç okunmaz.
  */
-export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor> | null; gecikme?: number; dis_ayar?: string | null; kasa?: Kasa | null; klasorAcici?: (yol: string) => void } = {}): Promise<TestKovani> {
+export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor> | null; gecikme?: number; dis_ayar?: string | null; kasa?: Kasa | null; klasorAcici?: (yol: string) => void; ajan_secimleri?: string | null; yolSecici?: (tur: "klasor" | "dosya") => Promise<string[] | null> } = {}): Promise<TestKovani> {
   const kok = secenek.kok ?? geciciKok();
   const motorlar = secenek.motorlar === null ? undefined : secenek.motorlar ?? new Map<string, Motor>([
     ["deneme", new DenemeMotoru(secenek.gecikme ?? 0)],
@@ -132,6 +132,8 @@ export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarl
     arayuz: path.join(kok, "arayuz-yok"),
     dis_ayar: secenek.dis_ayar ?? null,
     klasorAcici: secenek.klasorAcici ?? (() => {}),   // testler Finder açmasın
+    ajan_secimleri: secenek.ajan_secimleri ?? null,
+    yolSecici: secenek.yolSecici ?? (async () => null),   // testler seçim penceresi açmasın     // testler geliştiricinin seçim dosyasına dokunmasın
     kasa: secenek.kasa ?? null,          // testler geliştiricinin Anahtar Zinciri'ne dokunmasın
   });
   return { ...k, kok };

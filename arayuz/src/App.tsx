@@ -78,7 +78,7 @@ export function App() {
           </main>
         </div>
       ) : rota.sayfa === "ajanlar" ? (
-        <main className="icerik icerik--genis">{ajanlar.veri ? <Ajanlar ajanlar={ajanlar.veri} seciliId={rota.id} durum={durum.veri} /> : <p className="bos-not">Yükleniyor...</p>}</main>
+        <main className="icerik icerik--genis">{ajanlar.veri ? <Ajanlar ajanlar={ajanlar.veri} seciliId={rota.id} durum={durum.veri} onDegisti={() => void ajanlar.yenile()} /> : <p className="bos-not">Yükleniyor...</p>}</main>
       ) : rota.sayfa === "ayarlar" ? (
         <main className="icerik icerik--genis"><Ayarlar durum={durum.veri} onDegisti={() => void durum.yenile()} /></main>
       ) : (

@@ -567,6 +567,19 @@ export class Orkestrator {
     }
   }
 
+  /** Durmuş ya da bekleyen bir fikrin modunu değiştirir (ör. Hepsi Claude → Hepsi yerel); sonraki ajan çağrıları yeni modda. */
+  modDegistir(fid: string, mod: string): void {
+    const f = this.fikirAl(fid);
+    if (f.durum === "calisiyor" || f.durum === "sirada" || this.calisanlar.has(fid)) throw new KovanHatasi("Çalışan bir fikrin modu değiştirilemez; önce durdur.", 409);
+    if (!MODLAR.includes(mod as Mod)) throw new KovanHatasi(`Bilinmeyen mod: ${mod} (hibrit, claude, yerel ya da deneme)`);
+    if (!this.acikModlar().includes(mod as Mod)) throw new KovanHatasi(`'${mod}' modu bu kurulumda kapalı. Açık modlar: ${this.acikModlar().join(", ")}`);
+    this.gerekenMotorlar(this.akislar.get(f.profil)!, mod as Mod);   // yerel motor tanımlı değilse anlaşılır hata
+    if (f.motor === mod) return;
+    const eski = f.motor;
+    this.depo.fikirGuncelle(fid, { motor: mod as Mod });
+    this.sistemAdimi(fid, null, "Mod değişti", "tamam", `${eski} → ${mod}. Sonraki ajan çağrıları yeni modda.`);
+  }
+
   devamEttir(fid: string): void {
     const f = this.fikirAl(fid);
     if (f.durum !== "durduruldu") throw new KovanHatasi("Yalnızca durdurulmuş bir fikir devam ettirilebilir.");

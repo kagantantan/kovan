@@ -350,6 +350,7 @@ export interface AjanOzeti {
   dosya: string;
   motor_modeli: string;
   motor_yerel: boolean;
+  secim: { motor: string; model: string } | null;   // Ajanlar ekranından seçilen motor ve model
   uretir: string[];
   onaylar: string[];
 }

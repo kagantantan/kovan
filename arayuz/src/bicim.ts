@@ -45,7 +45,7 @@ export const FIKIR_DURUMU: Record<FikirDurumu, string> = {
 export const MOD_ADI: Record<Mod, string> = { hibrit: "Hibrit", claude: "Hepsi Claude", yerel: "Hepsi yerel", deneme: "Deneme" };
 
 export const MOD_ACIKLAMA: Record<Mod, string> = {
-  hibrit: "Kodu yerel model yazar; analiz, tasarım ve onaylar Claude'da.",
+  hibrit: "Her ajan Ajanlar ekranında seçtiğin motor ve modelde çalışır. Varsayılan: kodu yerel model yazar, analiz ve onaylar Claude'da.",
   claude: "Bütün ajanlar Claude'da. Yerel motor hazır değilse ya da kıyas için.",
   yerel: "Bütün ajanlar yerel motorda; hiçbir çağrı Claude'a gitmez. Kurum içi kod için. Daha yavaş, daha fazla düzeltme turu.",
   deneme: "Gerçek ajan çalışmaz, token harcanmaz. Akışı ve soruları görmek için.",

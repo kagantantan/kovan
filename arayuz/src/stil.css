@@ -656,3 +656,13 @@ button.adim-satir:hover { background: var(--duman); }
 
 .fikir-klasor { margin: 10px 0 0; font-size: 13px; color: var(--propolis-3); overflow-wrap: anywhere; }
 .fikir-klasor code { font-size: 12.5px; }
+
+.motor-secimi { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(160px, 2fr); gap: 8px 12px; margin-top: 10px; max-width: 560px; }
+.motor-secimi .alan { margin: 0; }
+.motor-secimi-dugmeler { grid-column: 1 / -1; display: flex; gap: 8px; }
+.motor-secimi > p { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 600px) { .motor-secimi { grid-template-columns: 1fr; } }
+
+.olcu-secim { font: inherit; padding: 1px 4px; }
+
+.yol-sec { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
