@@ -46,16 +46,19 @@ const ORTAK_KURALLAR = `# Ortak kurallar (her ajan için)
 - "Alınan kararlar" bölümündeki kararlar (ekibin oybirliğiyle ya da projenin sahibinin verdiği) bağlayıcıdır; onlarla çelişme.
 - Türkçe yaz; yerleşmiş teknik terimleri (test, interface, rounding, edge case gibi) İngilizce bırak.`;
 
-/** Üretici ve onaycı için soru kuralları. ekip: soru önce ortak karara gider. */
-function soruKurali(ekip: boolean, inceleme: boolean): string {
+/** Üretici ve onaycı için soru kuralları. ekip: soru önce ortak karara gider; isKurali: iş kuralı soruları ekibe uğramaz. */
+function soruKurali(ekip: boolean, inceleme: boolean, isKurali = false): string {
   const nereye = ekip
     ? "Soruların önce ekibe gider: Ürün Sahibi, Mimar ve Analist oy verir (senin önerin de oydur). Oybirliğiyle karar çıkarsa projenin sahibine sorulmaz; anlaşamazsanız soru oylarla birlikte ona gider."
     : "Soruların doğrudan projenin sahibine gider.";
   const insanKurali = ekip
     ? '\n- "insan": true yalnızca kararı projenin sahibi verebiliyorsa: para ve bütçe, hukuki bir riski kabul etmek, geri dönüşü olmayan bir işlem, marka ya da iş stratejisi. Bu sorular ekibe uğramadan ona gider.'
     : "";
+  const konuKurali = ekip && isKurali
+    ? '\n- Her soruya "konu" yaz: "is_kurali" ya da "teknik". İş kuralı: doküman ile kodun çeliştiği yerler, hesaplama, yuvarlama ve tarih kuralları, kapsam, hata ve istisna davranışı, mevzuat yorumu. Bu aşamada iş kuralı soruları ekibe uğramadan projenin sahibine gider; teknik sorular (teknoloji, yapı, araç seçimi) önce ekipte oylanır. Emin değilsen "is_kurali" yaz.'
+    : "";
   const ortak = `- En fazla 3 soru; her soruda 2-4 seçenek. Önerdiğini ilk sıraya koy ve etiketinin sonuna "(Önerilen)" yaz.
-- "Diğer" seçeneği ekleme; projenin sahibi her zaman kendi cevabını yazabilir. Birden çok seçenek seçilebilecekse "coklu": true yap.${insanKurali}`;
+- "Diğer" seçeneği ekleme; projenin sahibi her zaman kendi cevabını yazabilir. Birden çok seçenek seçilebilecekse "coklu": true yap.${insanKurali}${konuKurali}`;
   if (inceleme) {
     return `# Soru (kovan-soru)
 Karar vermen bir ürün ya da kapsam kararına bağlıysa ve yanlış bir varsayım işi boşa çıkaracaksa "karar": "SORU" ver, soruları "sorular" alanına yaz. ${nereye}
@@ -86,6 +89,19 @@ const KAPSAM_KURALI = `# Kapsam
 Bu fikirde senin alanına giren hiçbir konu yoksa (ör. kişisel veri, ödeme ya da düzenlemeye tabi bir iş yok) ONAY ver,
 gerekçede bunu bir cümleyle söyle ve "kapsam_disi": true ekle. Sonraki aşamalarda seni bu fikir için çağırmayız.
 Emin değilsen kapsam_disi verme; ilgili bir konu varsa normal incele.`;
+
+/** once_soru aşamalarında ilk adım: belge yazılmadan önce açık sorular ve varsayımlar projenin sahibine gider. */
+const ONCE_SORU = `# Önce soru (kontrol noktası)
+Bu aşamada belgeni yazmadan önce projenin sahibiyle bir soru turu yapılır. Girdileri oku, sonra çıktın YALNIZCA şu blok olsun:
+\`\`\`kovan-soru
+{"sorular": [{"baslik": "3-4 kelime", "soru": "Tek başına anlaşılır, net bir soru?", "coklu": false, "insan": true, "konu": "is_kurali",
+  "secenekler": [{"etiket": "Önerdiğin seçenek (Önerilen)", "aciklama": "Seçilirse ne olur; hangi varsayımla"}, {"etiket": "Başka seçenek", "aciklama": "Seçilirse ne olur"}]}]}
+\`\`\`
+- 1-3 soru: işin sonucunu en çok değiştirecek açık noktalar. Önce doküman ile kodun çeliştiği yerler, sonra belirsiz iş kuralları.
+- Yapacağın önemli varsayımları da birer soru olarak getir: önerdiğin seçenek varsayımın, açıklamada dayanağı (ör. kod atfı).
+- Cevabı girdilerde ya da "Alınan kararlar" bölümünde olan bir şeyi sorma.
+- Her soruda 2-4 seçenek; önerdiğini ilk sıraya koy, etiketinin sonuna "(Önerilen)" yaz. "Diğer" ekleme.
+- Bu sorular ekibe uğramadan projenin sahibine gider. Cevaplar gelince aynı aşama yeniden çalışır ve belgeni yazarsın.`;
 
 const SORU_HAKKI_DOLDU = "# Soru\nBu aşamada soru hakkın doldu. Belirsizliklerde \"VARSAYIM:\" yazıp devam et.";
 
@@ -767,7 +783,8 @@ export class Orkestrator {
     const cwd = path.join(d, dizinModu ? "kod" : "belgeler");
     if (asama.kilitle.length) this.kilitKaldir(fid, asama.kilitle);
     const istem = this.uretimIstemi(fid, asama, geriBildirim, dizinModu);
-    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, this.soruKurallari(f)].filter(Boolean).join("\n\n");
+    const onceSoru = this.onceSoruTuru(f, asama, tur, geriBildirim);
+    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, onceSoru ? ONCE_SORU : this.soruKurallari(f, false, asama)].filter(Boolean).join("\n\n");
     let son: AjanSonucu | null = null;
     let sonHata = "";
     let deneme = 0;
@@ -793,8 +810,11 @@ export class Orkestrator {
         const soru = this.cfg.ajan_sorulari ? soruCikar(son.metin) : null;
         if (soru?.sorular) {
           this.adimKapat(fid, adim, "soru", son, `${soru.sorular.length} soru: ${soru.sorular.map((s) => s.baslik).join(", ")}`, gunluk);
-          return [await this.soruyuIsle(fid, asama, soru.sorular.map((x) => this.ajanSorusu(kart, x)), "uret", null, null), []];
+          const sorular = soru.sorular.map((x) => this.ajanSorusu(kart, x))
+            .map((s) => (onceSoru ? { ...s, insan: true, neden: `Kontrol noktası: ${kart.ad} belgeyi yazmadan önce açık sorularını ve varsayımlarını sana getirdi.` } : s));
+          return [await this.soruyuIsle(fid, asama, sorular, "uret", null, null), []];
         }
+        if (onceSoru) this.sistemAdimi(fid, asama, "Kontrol noktası", "uyari", `${kart.ad} belgeyi yazmadan önce soru sormadı; belge yazıldı, onay kurulu inceleyecek.`);
         if (soru?.hata) {
           sonHata = `Soru bloğu okunamadı: ${soru.hata}`;
           this.adimKapat(fid, adim, "hata", son, sonHata, gunluk);
@@ -962,7 +982,7 @@ export class Orkestrator {
     const kaynakOkur = !dizinModu && Boolean(f.kaynak) && kart.araclar.includes("Read");
     const cwd = path.join(this.calisma, fid, dizinModu || kaynakOkur ? "kod" : "belgeler");
     const istem = this.incelemeIstemi(fid, asama, v, tur, dizinModu, kaynakOkur);
-    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, INCELEME_KURALLARI, v.atlanabilir ? KAPSAM_KURALI : "", this.soruKurallari(f, true)].filter(Boolean).join("\n\n");
+    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, INCELEME_KURALLARI, v.atlanabilir ? KAPSAM_KURALI : "", this.soruKurallari(f, true, asama)].filter(Boolean).join("\n\n");
     let son: AjanSonucu | null = null;
     for (let deneme = 1; deneme <= this.cfg.deneme_sayisi; deneme++) {
       const adim = this.depo.adimEkle({ fikir_id: fid, asama_id: asama.id, asama_ad: asama.ad, tip: "inceleme", ajan: kart.id, ajan_ad: kart.ad, tur, deneme, durum: "calisiyor", motor: motor.ad, model });
@@ -1008,11 +1028,16 @@ export class Orkestrator {
   // -------------------------------- istemler --------------------------------
   /** Soru hakkı yumuşak sınırdır: dolunca istem bunu söyler; ajan yine de sorarsa soru ekibe uğramadan sana gelir
    *  (her soru senin cevabını beklediği için başıboş bir döngü oluşamaz). */
-  private soruKurallari(f: Fikir, inceleme = false): string {
+  private soruKurallari(f: Fikir, inceleme = false, asama: Asama | null = null): string {
     if (!this.cfg.ajan_sorulari) return "";
     if (f.soru_turu >= this.cfg.en_fazla_soru_turu) return SORU_HAKKI_DOLDU;
     const akis = this.akislar.get(f.profil);
-    return soruKurali(Boolean(akis && this.ortakKararAcik(akis)), inceleme);
+    return soruKurali(Boolean(akis && this.ortakKararAcik(akis)), inceleme, Boolean(asama?.is_kurali_sana));
+  }
+
+  /** once_soru aşamasının ilk üretimi mi: aşamada henüz soru sorulmadı, geri bildirimle dönülmedi. */
+  private onceSoruTuru(f: Fikir, asama: Asama, tur: number, geriBildirim: string | null): boolean {
+    return asama.once_soru && this.cfg.ajan_sorulari && f.soru_turu === 0 && tur === 1 && !geriBildirim;
   }
 
   private ortakKararAcik(akis: Akis): boolean {
@@ -1317,7 +1342,8 @@ export class Orkestrator {
   }
 
   private ajanSorusu(kart: AjanKarti, x: HamSoru): AjanSorusu {
-    return { baslik: x.baslik, soru: x.soru, coklu: x.coklu, secenekler: x.secenekler, soran: kart.id, soran_ad: kart.ad, ...(x.insan ? { insan: true } : {}) };
+    return { baslik: x.baslik, soru: x.soru, coklu: x.coklu, secenekler: x.secenekler, soran: kart.id, soran_ad: kart.ad,
+      ...(x.insan ? { insan: true } : {}), ...(x.konu ? { konu: x.konu } : {}) };
   }
 
   private sorulariSor(fid: string, asama: Asama, sorular: AjanSorusu[], kaynak: BeklemeKaynagi, bekleyenGeriBildirim: string | null = null,
@@ -1359,7 +1385,8 @@ export class Orkestrator {
     const insana: AjanSorusu[] = [];
     const oylanacak: AjanSorusu[] = [];
     for (const s of sorular) {
-      if (s.insan) insana.push({ ...s, neden: `${s.soran_ad}: bu kararı yalnızca sen verebilirsin (para, hukuki risk, geri dönüşsüz işlem ya da strateji).` });
+      if (s.insan) insana.push({ ...s, neden: s.neden ?? `${s.soran_ad}: bu kararı yalnızca sen verebilirsin (para, hukuki risk, geri dönüşsüz işlem ya da strateji).` });
+      else if (asama.is_kurali_sana && s.konu !== "teknik") insana.push({ ...s, neden: "İş kuralı sorusu: bu aşamada iş kuralı soruları ekibe uğramadan sana gelir." });
       else oylanacak.push(s);
     }
     if (!oylanacak.length) return { kararlar: [], insana };

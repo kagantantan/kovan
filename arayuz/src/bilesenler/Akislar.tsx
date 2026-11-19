@@ -19,6 +19,12 @@ function AdimGovdesi({ s }: { s: AkisAsamaOzeti }) {
           {s.kilitle.length > 0 && <>Aşama geçince {s.kilitle.map((y) => <code key={y}>{y}</code>)} kilitlenir.</>}
         </p>
       )}
+      {(s.once_soru || s.is_kurali_sana) && (
+        <p className="asama-sinir">
+          {s.once_soru && <>Kontrol noktası: {s.ajan_ad} belgeyi yazmadan önce açık sorularını ve varsayımlarını sana getirir. </>}
+          {s.is_kurali_sana && <>İş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir; teknik sorular ekipte oylanır.</>}
+        </p>
+      )}
       {s.salt_okunur && <p className="asama-sinir">Salt okunur: hiçbir dosyaya yazamaz, yalnızca okur ve belgesini yazar.</p>}
       {atif && <p>Sistem denetimi: her kod atfı (<code>kaynak/dosya:satır</code>) gerçek bir dosya ve satıra gitmeli; uydurma atıf onay kuruluna gitmeden geri döner.</p>}
       {plan && <p>Sistem denetimi: <code>kovan-plan</code> bloğu (kalem kimlikleri, yazılımcı, bağımlılık, döngü). Bozuksa onay kurulu harcanmaz.</p>}

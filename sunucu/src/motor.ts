@@ -143,6 +143,7 @@ export interface HamSoru {
   soru: string;
   coklu: boolean;
   insan: boolean;     // ajana göre kararı yalnızca projenin sahibi verebilir; ekip oylamaz
+  konu: "is_kurali" | "teknik" | null;   // yalnızca is_kurali_sana aşamalarında anlamlı
   secenekler: { etiket: string; aciklama: string }[];
 }
 
@@ -158,7 +159,8 @@ export function sorulariDogrula(ham: unknown): { sorular?: HamSoru[]; hata?: str
       .filter((o: { etiket: string }) => o.etiket)
       .slice(0, 4);
     if (!soru || secenekler.length < 2) return { hata: "her soruda metin ve en az 2 seçenek olmalı" };
-    sorular.push({ soru, baslik: kisalt(String(s?.baslik ?? "") || soru, 24), coklu: Boolean(s?.coklu), insan: s?.insan === true, secenekler });
+    sorular.push({ soru, baslik: kisalt(String(s?.baslik ?? "") || soru, 24), coklu: Boolean(s?.coklu), insan: s?.insan === true,
+      konu: s?.konu === "teknik" || s?.konu === "is_kurali" ? s.konu : null, secenekler });
   }
   return { sorular };
 }

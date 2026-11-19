@@ -12,6 +12,8 @@ asamalar:
   - id: mevcut-sistem
     ad: Mevcut sistemi anlama
     ajan: mevcut-sistem-analisti
+    is_kurali_sana: true      # iş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir
+    once_soru: true           # ajan belgeyi yazmadan önce açık sorularını ve varsayımlarını sana getirir
     calisma_dizini: kod
     salt_okunur: true
     gorev: >
@@ -37,6 +39,8 @@ asamalar:
   - id: brif
     ad: Kapsam ve kabul paketi
     ajan: urun-sahibi
+    is_kurali_sana: true      # iş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir
+    once_soru: true           # ajan belgeyi yazmadan önce açık sorularını ve varsayımlarını sana getirir
     gorev: >
       Mevcut sistem analizine göre yeniden yazımın kapsamını çıkar: hangi işler taşınıyor, hangileri
       dışarıda, kod nereye entegre edilecek, neyi projenin sahibinin sistemi sağlayacak. Ölçülebilir
@@ -47,6 +51,8 @@ asamalar:
   - id: hedef-analiz
     ad: Hedef analiz
     ajan: analist
+    is_kurali_sana: true      # iş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir
+    once_soru: true           # ajan belgeyi yazmadan önce açık sorularını ve varsayımlarını sana getirir
     gorev: >
       Yeni sistemin ne yapacağını yaz: her eski kural (E1...) için AYNEN KORU, DEĞİŞTİR ya da BIRAK
       kararı ve gerekçesi; yeni kurallar (K1...) eski kurallarla eşlenmiş; uç durumlar ve hata davranışı.

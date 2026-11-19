@@ -12,10 +12,20 @@ import type { Fikir } from "../../src/tipler.js";
 
 export const KOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-/** Kovan kökünün geçici kopyası. ekAkislar: akislar/<ad>.yaml olarak eklenir. */
-export function geciciKok(ekAkislar: Record<string, string> = {}): string {
+/**
+ * Kovan kökünün geçici kopyası. ekAkislar: akislar/<ad>.yaml olarak eklenir.
+ * analizKontrolleri: false ise akışlardaki is_kurali_sana ve once_soru kapatılır (ekip oylamasını ve derin
+ * planlamayı sınayan testler için; analiz aşamalarının insan döngüsü kendi testlerinde sınanır).
+ */
+export function geciciKok(ekAkislar: Record<string, string> = {}, secenek: { analizKontrolleri?: boolean } = {}): string {
   const kok = fs.mkdtempSync(path.join(os.tmpdir(), "kovan-test-"));
   for (const ad of ["ajanlar", "akislar"]) fs.cpSync(path.join(KOK, ad), path.join(kok, ad), { recursive: true });
+  if (secenek.analizKontrolleri === false) {
+    for (const ad of fs.readdirSync(path.join(kok, "akislar"))) {
+      const yol = path.join(kok, "akislar", ad);
+      fs.writeFileSync(yol, fs.readFileSync(yol, "utf8").replace(/^ +(is_kurali_sana|once_soru): true.*\n/gm, ""));
+    }
+  }
   for (const ad of ["package.json", "kovan.yaml"]) fs.copyFileSync(path.join(KOK, ad), path.join(kok, ad));
   for (const [ad, icerik] of Object.entries(ekAkislar)) fs.writeFileSync(path.join(kok, "akislar", `${ad}.yaml`), icerik);
   return kok;

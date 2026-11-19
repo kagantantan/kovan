@@ -33,6 +33,9 @@ export interface Oy {
 }
 
 /** Ajanın sorduğu çoktan seçmeli soru. Önce ekip oylar; anlaşamazsa insana gelir. */
+/** is_kurali: doküman-kod çelişkisi, hesap, tarih, kapsam, hata davranışı, mevzuat yorumu; teknik: uygulama ve teknoloji tercihi. */
+export type SoruKonusu = "is_kurali" | "teknik";
+
 export interface AjanSorusu {
   baslik: string;
   soru: string;
@@ -41,6 +44,7 @@ export interface AjanSorusu {
   soran: string;        // ajan kart id
   soran_ad: string;
   insan?: boolean;      // soran ajana göre bu kararı yalnızca projenin sahibi verebilir
+  konu?: SoruKonusu;    // is_kurali_sana aşamalarında yönlendirme için
   oylar?: Oy[];         // ekip oyladıysa: kim neyi seçti
   neden?: string;       // neden sana geldi
   oneri_id?: string;    // gelişim önerisi (kaynak: gelisim)
@@ -341,6 +345,8 @@ export interface AkisAsamaOzeti {
   kilitle: string[];
   yazabilir: string[];
   en_fazla_tur: number;
+  is_kurali_sana: boolean;
+  once_soru: boolean;
   dogrulama: { ad: string; tip: "komut" | "ajan" | "plan" | "atif"; komut: string | null; inceleyen: string | null; inceleyen_ad: string | null; atlanabilir: boolean; taraf: string | null }[];
   kalem_adimlari: AkisAsamaOzeti[];   // tur: kalemler ise her kalem için tekrarlanan adımlar
 }

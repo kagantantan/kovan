@@ -321,6 +321,15 @@ Ayarlar (`kovan.yaml`): `ortak_karar.kurul` (kimler oylar), `ortak_karar.kural` 
 
 ![Teslim kararı: notla geri gönderme](docs/karar-karti.png)
 
+**Analiz aşamalarında sen döngüdesin.** Analizdeki yanlış bir varsayım bütün işi boşa çıkarır; ekibin oybirliğiyle yanlış tarafı seçmesini en sondaki kabulde görmek geç olur. Bu yüzden Replatform'da *Mevcut sistemi anlama*, *Kapsam* ve *Hedef analiz*, Standart ve Tam yığın'da *Kapsam* ve *Analiz* aşamalarında iki ayar açık:
+
+| Ayar (akış dosyasında, aşama başına) | Ne olur |
+|---|---|
+| `once_soru: true` | **Kontrol noktası.** Ajan belgeyi yazmadan önce işin sonucunu en çok değiştirecek 1-3 açık soruyu ve önemli varsayımlarını sana getirir (önce doküman-kod çelişkileri). Bu sorular oylanmaz. Cevaplarınla aynı aşama yeniden çalışır ve belge yazılır. Ajan soru sormazsa zaman çizelgesine not düşer |
+| `is_kurali_sana: true` | Aşamanın geri kalanında ajanlar soruya `konu` yazar. **İş kuralı** soruları (doküman-kod farkı, hesap, yuvarlama, tarih, kapsam, hata davranışı, mevzuat yorumu) ekibe uğramadan sana gelir; **teknik** sorular (teknoloji, yapı, araç) önce ekipte oylanır. Konu yazılmamışsa soru sana gelir |
+
+Bunlar her analiz aşamasına bir soru turu ekler: biraz daha uzun sürer ve biraz daha çok token harcar. Kapatmak için akış dosyasında ilgili satırları sil; Mini akışta kapalı.
+
 **Seni darlamasınlar diye:** sorular önce ekipte çözülür; bir aşamada en fazla `en_fazla_soru_turu` (varsayılan 2) soru turu açılır. Hak dolunca ajanlara "VARSAYIM yaz, devam et" denir. Soruları tamamen kapatmak için `kovan.yaml`'da `ajan_sorulari: false`.
 
 **Haberin olsun diye:** bir fikir seni beklediğinde sekme başlığı "(N) Kovan" olur; üst çubuktaki **Bildirim al** ile sekme arka plandayken masaüstü bildirimi gelir.

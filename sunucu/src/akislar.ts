@@ -50,6 +50,8 @@ export interface Asama {
   en_fazla_tur: number;
   soru: string;
   geri_donus: string | null;
+  is_kurali_sana: boolean;                             // iş kuralı soruları ekibe uğramadan insana gider
+  once_soru: boolean;                                  // ajan belgeyi yazmadan önce açık sorularını insana getirir
   kalem: KalemBilgisi | null;                          // genişletilmiş iş kalemi aşaması
   plan: string | null;                                 // tur: kalemler -> planı içeren belge
   gelistiriciler: Record<string, GelistiriciAyari>;    // tur: kalemler
@@ -73,6 +75,7 @@ export function bosAsama(id: string, ad: string): Asama {
   return {
     id, ad, tur: "ajan", ajan: null, gorev: "", girdiler: [], cikti: null, calisma_dizini: null, salt_okunur: false,
     yazabilir: [], kilitle: [], dogrulama: [], en_fazla_tur: 2, soru: "", geri_donus: null,
+    is_kurali_sana: false, once_soru: false,
     kalem: null, plan: null, gelistiriciler: {}, adimlar: [],
   };
 }
@@ -145,6 +148,8 @@ function asamaOku(dosya: string, ham: Record<string, any>, i: number, kartlar: M
     en_fazla_tur: Number(ham.en_fazla_tur ?? 2),
     soru: String(ham.soru ?? ""),
     geri_donus: ham.geri_donus ? String(ham.geri_donus) : null,
+    is_kurali_sana: Boolean(ham.is_kurali_sana),
+    once_soru: Boolean(ham.once_soru),
   };
 }
 
@@ -237,6 +242,7 @@ function asamaOzeti(s: Asama, kartlar: Map<string, AjanKarti>, gelistiriciler: s
     ajan_kisa: (s.ajan && kartlar.get(s.ajan)?.kisaltma) || (s.ajan === GELISTIRICI_YER_TUTUCU ? yazilimcilar : null),
     girdiler: s.girdiler, cikti: s.cikti, salt_okunur: s.salt_okunur,
     kilitle: s.kilitle, yazabilir: s.yazabilir, en_fazla_tur: s.en_fazla_tur,
+    is_kurali_sana: s.is_kurali_sana, once_soru: s.once_soru,
     dogrulama: s.dogrulama.map((d) => ({ ad: d.ad, tip: d.tip, komut: d.komut, inceleyen: d.inceleyen, inceleyen_ad: ad(d.inceleyen), atlanabilir: d.atlanabilir, taraf: d.taraf })),
     kalem_adimlari: s.adimlar.map((x) => asamaOzeti(x, kartlar, Object.keys(s.gelistiriciler))),
   };

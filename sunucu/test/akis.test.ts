@@ -1,11 +1,15 @@
 // Uçtan uca akışlar (deneme motoru): sorular, ortak karar, karar defteri, iş kalemleri, test döngüsü,
 // onay kurulu, mevzuat kapsamı, teslim, gelişim önerileri, yeni sürüm ve geri gönderme.
 import { describe, expect, it } from "vitest";
-import { bekle, bekliyor, dosya, istemi, kovanOlustur, ORNEK_MINI, ORNEK_PANEL, varMi } from "./yardimci/ortam.js";
+import { bekle, bekliyor, dosya, geciciKok, istemi, kovanOlustur, ORNEK_MINI, ORNEK_PANEL, varMi } from "./yardimci/ortam.js";
+
+// Bu dosya derin planlamayı ve ekip oylamasını sınar; analiz aşamalarının insan döngüsü (is_kurali_sana, once_soru)
+// insan-dongusu.test.ts'te. Burada kapalı, yoksa PO'nun brif sorusu ekibe uğramadan sana gelir.
+const kur = () => kovanOlustur({ kok: geciciKok({}, { analizKontrolleri: false }) });
 
 describe("Mini akış (ortak karar kapalı)", () => {
   it("PO sorar, soru doğrudan sana gelir; cevap deftere girer, testler kırmızıdan yeşile döner, teslim kabul edilir", async () => {
-    const k = await kovanOlustur();
+    const k = await kur();
     const fid = await k.ork.yeniFikir("Flora AI analiz kredisi", ORNEK_MINI, "mini", "deneme");
 
     let f = await bekle(k, fid, bekliyor("ajan_sorusu"));
@@ -47,7 +51,7 @@ describe("Mini akış (ortak karar kapalı)", () => {
   });
 
   it("notla geri gönderilen aşama notu görür; sonraki aşamalar yeniden yazılmaz, yeniden doğrulanır", async () => {
-    const k = await kovanOlustur();
+    const k = await kur();
     const fid = await k.ork.yeniFikir("", ORNEK_MINI, "mini", "deneme");
     await bekle(k, fid, bekliyor("ajan_sorusu"));
     k.ork.cevapla(fid, [{ secilenler: ["Türkçe"] }]);
@@ -69,7 +73,7 @@ describe("Mini akış (ortak karar kapalı)", () => {
 
 describe("Standart akış: derin planlama ve iş kalemleri", () => {
   it("ekip kendi karar verir, anlaşamadığını oylarla sorar; kod ancak plandan ve kilitli testlerden sonra yazılır", async () => {
-    const k = await kovanOlustur();
+    const k = await kur();
     const fid = await k.ork.yeniFikir("Flora AI hatırlatma servisi", ORNEK_MINI, "standart", "deneme");
 
     // PO'nun "Arayüz dili" sorusu ekipte oybirliğiyle karara bağlandı; sana ilk gelen Mevzuat'ın sorusu.
@@ -145,7 +149,7 @@ describe("Standart akış: derin planlama ve iş kalemleri", () => {
   });
 
   it("kabulden sonra PO gelişim önerileri getirir; kabul ettiklerinle yeni sürüm kodu ve kararları devralır", async () => {
-    const k = await kovanOlustur();
+    const k = await kur();
     const fid = await k.ork.yeniFikir("Flora AI hatırlatma servisi", ORNEK_MINI, "standart", "deneme");
     await bekle(k, fid, bekliyor("ajan_sorusu"));
     k.ork.cevapla(fid, [{ secilenler: ["Hayır, anonim kullanım"] }]);
@@ -195,7 +199,7 @@ describe("Standart akış: derin planlama ve iş kalemleri", () => {
   });
 
   it("teslim planına geri gönderilince kalemler yeni plandan açılır; önceki kalemler yeniden yazılmaz, yeniden doğrulanır", async () => {
-    const k = await kovanOlustur();
+    const k = await kur();
     const fid = await k.ork.yeniFikir("", ORNEK_MINI, "standart", "deneme");
     await bekle(k, fid, bekliyor("ajan_sorusu"));
     k.ork.cevapla(fid, [{ secilenler: ["Hayır, anonim kullanım"] }]);
@@ -211,7 +215,7 @@ describe("Standart akış: derin planlama ve iş kalemleri", () => {
 
 describe("Tam yığın akış", () => {
   it("mevzuat konusu yoksa Mevzuat bir kez 'kapsam dışı' der ve atlanır; FE kalemine UX bakar", async () => {
-    const k = await kovanOlustur();
+    const k = await kur();
     const fid = await k.ork.yeniFikir("Flora AI bakım paneli", ORNEK_PANEL, "tam-yigin", "deneme");
     const f = await bekle(k, fid, (x) => x.durum === "bekliyor", 60_000);
     expect(f.bekleme!.sebep).toBe("insan");                             // hiçbir soru sana gelmedi: ekip karar verdi

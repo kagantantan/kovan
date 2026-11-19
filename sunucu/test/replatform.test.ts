@@ -141,9 +141,9 @@ describe("Replatform akışı", () => {
     // Mevcut sistem: salt okunur aşama, atıflar sistemce doğrulandı, üç onaycı
     const ms = d.adimlar.filter((a) => a.asama_id === "mevcut-sistem");
     expect(ms.map((a) => `${a.tip}:${a.durum}:${a.ajan_ad}`)).toEqual([
-      "uret:tamam:Mevcut Sistem Analisti", "kontrol:yesil:Kaynak atıfları", "inceleme:onay:İş Analisti", "inceleme:onay:Ana Mimar", "inceleme:onay:Test Analisti",
+      "uret:tamam:Mevcut Sistem Analisti", "sistem:uyari:Kontrol noktası", "kontrol:yesil:Kaynak atıfları", "inceleme:onay:İş Analisti", "inceleme:onay:Ana Mimar", "inceleme:onay:Test Analisti",
     ]);
-    expect(ms[1].ozet).toMatch(/atıf, hepsi gerçek dosya ve satırlara gidiyor/);
+    expect(ms[2].ozet).toMatch(/atıf, hepsi gerçek dosya ve satırlara gidiyor/);
     expect(d.asamalar[0].onaylar.map((o) => `${o.kisa}:${o.durum}`)).toEqual(["ATIF:yesil", "ANLZ:onay", "TKM:onay", "KTST:onay"]);
     const msIstem = istemi(k, fid, ms[0].id);
     expect(msIstem).toContain("## Mevcut sistem\nBu iş bir replatform");
@@ -153,12 +153,17 @@ describe("Replatform akışı", () => {
     expect(analiz).toContain(`FARK: Gün esası: doküman 360 diyor, kod 365 kullanıyor. ${PKB}:5`);
     expect(analiz).toContain(`E2: Sıfır ya da alacaklı bakiyeye faiz işlemez. ${PKB}:10-12`);
 
-    // Brif soru sormadı (arayüz yok); doküman-kod farkını analist sordu, ekip bölündü
-    expect(d.adimlar.filter((a) => a.asama_id === "brif").map((a) => `${a.tip}:${a.durum}`)).toEqual(["uret:tamam"]);
+    // Brif kontrol noktasında soru sormadı (arayüz yok, not düştü); doküman-kod farkını analist kontrol noktasında
+    // sordu: analiz aşamasında iş kuralı soruları ekibe uğramadan sana gelir
+    expect(d.adimlar.filter((a) => a.asama_id === "brif").map((a) => `${a.tip}:${a.durum}`)).toEqual(["uret:tamam", "sistem:uyari"]);
     expect(f.bekleme!.asama_id).toBe("hedef-analiz");
     const soru = f.bekleme!.sorular![0];
     expect([soru.baslik, soru.soran]).toEqual(["Gün esası", "analist"]);
-    expect(soru.oylar!.map((o) => `${o.kisa}:${o.secim.join("+")}`)).toEqual(["ANLZ:Koddaki gibi 365", "PO:Koddaki gibi 365", "TKM:Dokümandaki gibi 360"]);
+    expect(soru.oylar).toBeUndefined();
+    expect(soru.neden).toMatch(/^Kontrol noktası: İş Analisti belgeyi yazmadan önce/);
+    expect(d.adimlar.some((a) => a.asama_id === "hedef-analiz" && a.tip === "oy")).toBe(false);
+    const haIlk = JSON.parse(dosya(k, fid, `gunluk/adim-${d.adimlar.find((a) => a.asama_id === "hedef-analiz" && a.tip === "uret")!.id}.json`));
+    expect(haIlk.sistem).toContain("# Önce soru (kontrol noktası)");
 
     k.ork.cevapla(fid, [{ secilenler: ["Koddaki gibi 365"] }]);
     f = await bekle(k, fid, bekliyor("insan"));
@@ -236,9 +241,9 @@ describe("Replatform akışı", () => {
     const d = k.ork.fikirDetayi(fid);
     const ms = d.adimlar.filter((a) => a.asama_id === "mevcut-sistem");
     expect(ms.map((a) => `${a.tur}:${a.tip}:${a.durum}`)).toEqual([
-      "1:uret:tamam", "1:kontrol:kirmizi", "2:uret:tamam", "2:kontrol:yesil", "2:inceleme:onay", "2:inceleme:onay", "2:inceleme:onay",
+      "1:uret:tamam", "1:sistem:uyari", "1:kontrol:kirmizi", "2:uret:tamam", "2:kontrol:yesil", "2:inceleme:onay", "2:inceleme:onay", "2:inceleme:onay",
     ]);
-    const ikinci = istemi(k, fid, ms[2].id);
+    const ikinci = istemi(k, fid, ms[3].id);
     expect(ikinci).toContain("### Kaynak atıfları: GEÇERSİZ");
     expect(ikinci).toContain(`${PKB}:999: dosya 48 satır; bu satırlar yok`);
     expect(ikinci).toContain("kaynak/reeskont-eski/YOK.pkb:3: böyle bir dosya yok");
@@ -264,7 +269,7 @@ describe("Hedef yığın ve Hepsi yerel", () => {
   it("Hepsi yerel: oylar ve onaylar dahil her çağrı yerel motorda; yerel motor yoksa hiçbir şey buluta gitmez", async () => {
     const claude = new SahteMotor("claude");
     const qwen = new SahteMotor("qwen-yerel", true);
-    const k = await kovanOlustur({ motorlar: motorlar(undefined, claude, qwen) });
+    const k = await kovanOlustur({ kok: geciciKok({}, { analizKontrolleri: false }), motorlar: motorlar(undefined, claude, qwen) });
     const fid = await k.ork.yeniFikir("", ORNEK_MINI, "standart", "yerel");
     await bekle(k, fid, bekliyor("ajan_sorusu"));
     k.ork.cevapla(fid, [{ secilenler: ["Hayır, anonim kullanım"] }]);
