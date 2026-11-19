@@ -6,7 +6,7 @@ import { useYokla } from "../kullan";
 import { Markdown, type AtifTiklama } from "./Markdown";
 import { Simge } from "./Simge";
 
-type Sekme = "belgeler" | "incelemeler" | "kod" | "kaynak" | "kararlar";
+type Sekme = "belgeler" | "incelemeler" | "kod" | "kaynak" | "kararlar" | "adr";
 
 const BELGE_ADI: Record<string, string> = {
   fikir: "Fikir metni", "kaynak-envanteri": "Kaynak envanteri", "mevcut-sistem": "Mevcut sistem analizi", brif: "Kapsam ve kabul paketi", analiz: "Analiz belgesi", "ux-ozeti": "UX özeti", "teknik-plan": "Teknik plan",
@@ -70,6 +70,7 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
     { id: "kod", ad: "Kod", sayi: kod.length },
     ...(kaynak.length ? [{ id: "kaynak" as Sekme, ad: "Mevcut sistem", sayi: kaynak.length }] : []),
     ...(detay.kararlar.length ? [{ id: "kararlar" as Sekme, ad: "Kararlar", sayi: detay.kararlar.length }] : []),
+    ...(detay.adrler.length ? [{ id: "adr" as Sekme, ad: "ADR", sayi: detay.adrler.length }] : []),
   ];
 
   const siraliBelgeler = [...belgeler].sort((a, b) => {
@@ -124,6 +125,8 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
 
       {sekme === "kararlar" ? (
         <KararDefteri detay={detay} />
+      ) : sekme === "adr" ? (
+        <AdrDefteri detay={detay} />
       ) : (
         <div className="dosyalar-govde">
           <nav className="dosya-listesi" aria-label="Dosya listesi">
@@ -247,6 +250,41 @@ function DosyaIcerigi({ fikirId, yol, canli, onAtif, vurgu }: { fikirId: string;
       </header>
       <div className="dosya-govde">{govde}</div>
     </article>
+  );
+}
+
+const ayni = (a: string, b: string) => a.toLocaleLowerCase("tr").trim() === b.toLocaleLowerCase("tr").trim();
+
+function AdrDefteri({ detay }: { detay: FikirDetayi }) {
+  return (
+    <div className="defter">
+      <p className="defter-not">Mimarın teknik planda aldığı ve onay kurulunun geçirdiği mimari kararlar. Kodda <code>adr/</code> altında durur ve kilitlidir:
+        yazılımcılar okur, değiştiremez. Kod incelemesi koda bu kararlara göre bakar.</p>
+      <ol className="defter-liste">
+        {detay.adrler.map((a) => (
+          <li key={a.id} className="defter-kayit">
+            <div className="defter-ust">
+              <span className="soru-cip">{a.id}</span>
+              <span className="rozet rozet--iyi">{a.alan}</span>
+              {a.kurallar.length > 0 && <span className="defter-kim">{a.kurallar.join(", ")}</span>}
+            </div>
+            <p className="defter-cevap">{a.baslik}</p>
+            <p className="defter-soru">{a.baglam}</p>
+            <ul className="adr-secenekler">
+              {a.secenekler.map((o) => (
+                <li key={o.ad} className={ayni(o.ad, a.karar) ? "adr-secenek adr-secenek--secili" : "adr-secenek"}>
+                  <b>{o.ad}</b>{ayni(o.ad, a.karar) && " · seçildi"}
+                  <span>+ {o.arti}</span>
+                  <span>− {o.eksi}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="defter-soru"><b>Gerekçe:</b> {a.gerekce}</p>
+            <p className="defter-soru"><b>Sonuçlar:</b> {a.sonuclar}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

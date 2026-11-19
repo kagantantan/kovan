@@ -83,10 +83,12 @@ asamalar:
     gorev: >
       Hedef analizi, alınan kararlardaki hedef yığınla temiz bir mimariye çevir: saf domain (hesaplama),
       uygulama katmanı, dış dünyaya portlar (veritabanı, muhasebe, zamanlayıcı, parametreler). Her eski
-      kuralın yeni yapıda nerede karşılandığını ve eski tabloların portlara nasıl eşleneceğini yaz.
+      kuralın yeni yapıda nerede karşılandığını ve eski tabloların portlara nasıl eşleneceğini yaz. Önemli kararları ADR olarak yaz; eski sistemin her giriş noktası için batch job mı, REST endpoint mi, ikisi mi olacağını bir calisma_bicimi ADR'siyle seç.
     girdiler: [brif, analiz, mevcut-sistem]
     cikti: teknik-plan
     dogrulama:
+      - ad: ADR biçimi
+        adr: { en_az: 2, zorunlu: [calisma_bicimi] }   # eski sistemin her giriş noktası: batch mı, endpoint mi, ikisi mi
       - ad: Analist onayı
         inceleyen: analist
         odak: Plan hedef analizdeki bütün kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?

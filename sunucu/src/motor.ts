@@ -831,6 +831,42 @@ const DENEME_UYUM_SORUSU = [{
 /** Fikir metninde mevzuatı ilgilendiren bir konu var mı (deneme: kaba anahtar kelime taraması). */
 const MEVZUAT_IZI = /fotoğraf|e-posta|konum|kişisel|kullanıcı|ödeme|kart|sağlık|premium|hesap|abonelik/i;
 
+/** Deneme: mimarın teknik plandaki ADR'leri (replatformda çalışma biçimi zorunlu). */
+const DENEME_ADR = (replatform: boolean) => [
+  "## Mimari karar kayıtları", "", "```kovan-adr", "adrler:",
+  ...(replatform ? [
+    "  - id: ADR-1", "    baslik: Gün sonu reeskontu batch job olarak çalışır", "    alan: calisma_bicimi",
+    "    baglam: Eski sistemde tek giriş noktası var, gün sonunda zamanlayıcının çağırdığı prosedür; çevrim içi çağıran yok.",
+    "    secenekler:",
+    "      - ad: Batch job", "        arti: Yeniden başlatma ve parça parça işleme hazır", "        eksi: Anlık sorgu için ayrı bir uç gerekir",
+    "      - ad: REST endpoint", "        arti: Başka sistemler anlık çağırabilir", "        eksi: Uzun süren iş HTTP zaman aşımına takılır",
+    "      - ad: İkisi", "        arti: Hem gün sonu hem anlık sorgu", "        eksi: Bugün kimsenin istemediği bir ucu da bakımda tutmak",
+    "    karar: Batch job",
+    "    gerekce: Bütün kartlar tek çalıştırmada işleniyor; zamanlayıcı zaten var. Endpoint istenirse aynı domain servisini çağırır.",
+    "    sonuclar: Hesap saf domain katmanında kalır; batch yalnızca onu çağıran adaptör.",
+    "    kurallar: [E1, E3, E5]",
+    "  - id: ADR-2", "    baslik: Para ve oranlar ondalık, kuruşa yarım yukarı", "    alan: veri",
+    "    baglam: Eski sistem NUMBER ve ROUND(x, 2) kullanıyor; eşdeğerlik birebir aynı tutarı istiyor.",
+    "    secenekler:",
+    "      - ad: Ondalık sayı, yarım yukarı", "        arti: Eski ROUND ile aynı sonuç", "        eksi: Kayan noktadan biraz yavaş",
+    "      - ad: Tamsayı kuruş", "        arti: Hızlı ve basit", "        eksi: Ara hesapta hassasiyet kaybı; eski sonuçla fark çıkar",
+    "    karar: Ondalık sayı, yarım yukarı",
+    "    gerekce: Altın testte tek kuruşluk fark kabul edilmiyor.",
+    "    sonuclar: Her hesapta ölçek ve yuvarlama modu açık yazılır.",
+    "    kurallar: [E1, E2]",
+  ] : [
+    "  - id: ADR-1", "    baslik: Veri tarayıcıda tutulur", "    alan: veri",
+    "    baglam: Tek kullanıcılı bir araç; hesap ya da senkronizasyon istenmedi.",
+    "    secenekler:",
+    "      - ad: Tarayıcı deposu", "        arti: Sunucu ve hesap gerekmez", "        eksi: Cihazlar arası taşınmaz",
+    "      - ad: Sunucu veritabanı", "        arti: Cihazlar arası erişim", "        eksi: Hesap, barındırma ve kişisel veri yükü",
+    "    karar: Tarayıcı deposu",
+    "    gerekce: Analizde senkronizasyon yok; en ucuz ve geri alınabilir seçim.",
+    "    sonuclar: Depolama bir port arkasında; ileride sunucuya taşınabilir.",
+  ]),
+  "```",
+].join("\n");
+
 const DENEME_PLAN = (fe: boolean) => [
   "# Teslim planı (deneme)", "", "> Bu belgeyi sahte motor üretti; gerçek bir ajan çalışmadı.", "",
   "İş üç dikey kaleme bölündü. Her kalem kendi kabul testiyle başlar; bir kalem bitmeden sonraki başlamaz.", "",
@@ -1202,13 +1238,14 @@ export class DenemeMotoru implements Motor {
       }
     }
 
+    const adrEki = c.rol === "mimar" && c.asama_id === "teknik-plan" ? "\n\n" + DENEME_ADR(replatform) : "";
     if (c.rol === "proje-yoneticisi" && c.asama_id === "teslim-plani") return replatform ? DENEME_REESKONT_PLAN : DENEME_PLAN(c.istem.includes("### ux-ozeti"));
     if (c.rol === "urun-sahibi" && c.asama_id === "gelisim") return replatform ? DENEME_REESKONT_GELISIM : DENEME_GELISIM;
     if (replatform && DENEME_REESKONT_BELGELER[c.asama_id]) {
       let belge = DENEME_REESKONT_BELGELER[c.asama_id];
       // İlk turda şüpheli davranış için karar eksik: eşdeğerlik onaycısı bunu yakalar
       if (c.asama_id === "hedef-analiz" && !geriBildirimVar) belge = belge.split("\n").filter((x) => !x.includes("ŞÜPHE-1") && !x.startsWith("- K5")).join("\n");
-      return belge + (geriBildirimVar ? "\n\n(düzeltildi) Düzeltme istekleri uygulandı." : "");
+      return belge + adrEki + (geriBildirimVar ? "\n\n(düzeltildi) Düzeltme istekleri uygulandı." : "");
     }
 
     const m = /### fikir\n([\s\S]*?)(?=\n### |\n## |$)/.exec(c.istem);
@@ -1233,6 +1270,6 @@ export class DenemeMotoru implements Motor {
         "| TS-FE-1 | P3 | FE | Bugün sulanacaklar listesi | görünür |", "| TS-FE-2 | P3 | FE | Boş bitki adı | hata mesajı |");
     }
     if (geriBildirimVar) satirlar.push("", "(düzeltildi) Düzeltme istekleri uygulandı.");
-    return satirlar.join("\n");
+    return satirlar.join("\n") + adrEki;
   }
 }

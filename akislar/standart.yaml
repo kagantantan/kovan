@@ -46,10 +46,12 @@ asamalar:
   - id: teknik-plan
     ad: Teknik plan
     ajan: mimar
-    gorev: Analizi en sade doğru teknik plana çevir (arayüz yok; yalnızca backend/). Uygulama sırasını öner.
+    gorev: Analizi en sade doğru teknik plana çevir (arayüz yok; yalnızca backend/). Uygulama sırasını öner. Önemli kararları ADR olarak yaz.
     girdiler: [brif, analiz]
     cikti: teknik-plan
     dogrulama:
+      - ad: ADR biçimi
+        adr: { en_az: 1 }
       - ad: Analist onayı
         inceleyen: analist
         odak: Plan analizdeki tüm kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?

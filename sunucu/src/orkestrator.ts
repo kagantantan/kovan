@@ -23,14 +23,17 @@ import { HEDEF_YIGINLAR, MODLAR, type Ayarlar, type Mod } from "./ayarlar.js";
 import type { Depo } from "./depo.js";
 import type {
   Adim, AjanSorusu, AsamaGorunumu, Bekleme, BeklemeKaynagi, BeklemeSebebi, Cevap, DosyaIcerigi, Fikir, FikirDetayi, FikirOzeti,
-  GelisimKarari, GelisimKaydi, GelisimOnerisi, Karar, OnayRozeti, Oy, PlanKalemi, PlanKalemiGorunumu, Secenek,
+  Adr, GelisimKarari, GelisimKaydi, GelisimOnerisi, Karar, OnayRozeti, Oy, PlanKalemi, PlanKalemiGorunumu, Secenek,
 } from "./tipler.js";
 export type { Cevap, Karar };
 import type { AjanKarti } from "./kartlar.js";
 import { KARAR_SEMASI, OY_SEMASI, jsonCikar, soruCikar, sonuc, sorulariDogrula, sureciOldur, type AjanCagrisi, type AjanSonucu, type HamSoru, type Motor } from "./motor.js";
-import { gelisimCikar, kalemleriGenislet, planCikar } from "./plan.js";
+import { adrCikar, adrDosyaAdi, adrMarkdown, gelisimCikar, kalemleriGenislet, planCikar } from "./plan.js";
 import { KAYNAK_KLASORU, atiflariDenetle, envanterBelgesi, kaynakIceAl } from "./kaynak.js";
 import { KovanHatasi, altinda, atomikYaz, bekle, jsonOku, kisalt, kuyruk, simdi } from "./ortak.js";
+
+/** Onaylanan ADR'lerin kod içindeki klasörü (kilitli). */
+const ADR_KLASORU = "adr";
 
 const YOKSAY_KLASOR = new Set(["__pycache__", ".pytest_cache", ".git", "node_modules", ".venv", "venv", "test-results",
   "playwright-report", "coverage", "dist", "build", ".next", ".vite", ".cache", ".turbo", ".parcel-cache",
@@ -591,6 +594,7 @@ export class Orkestrator {
       kararlar: this.kararlar(fid),
       plan: planGorunumu,
       gelisim: this.gelisimDefteri(fid),
+      adrler: this.adrOku(fid),
       sonraki_surum_metni: f.durum === "tamamlandi" && !f.sonraki_surum ? this.sonrakiSurumMetni(fid) || null : null,
       dosyalar: this.dosyaListesi(fid),
       onizlemeler: this.onizlemeler(fid),
@@ -602,9 +606,10 @@ export class Orkestrator {
 
   private onayRozetleri(f: Fikir, a: Asama, adimlar: Adim[]): OnayRozeti[] {
     return a.dogrulama.map((v) => {
-      if (v.tip === "komut" || v.tip === "plan" || v.tip === "atif") {
+      if (v.tip !== "ajan") {
         const son = adimlar.filter((s) => s.asama_id === a.id && s.tip === "kontrol" && s.ajan_ad === v.ad).at(-1);
-        return { ad: v.ad, kisa: v.tip === "plan" ? "PLAN" : v.tip === "atif" ? "ATIF" : "TEST", durum: son?.durum ?? null };
+        const kisa = { plan: "PLAN", atif: "ATIF", adr: "ADR", komut: "TEST" }[v.tip];
+        return { ad: v.ad, kisa, durum: son?.durum ?? null };
       }
       const kart = this.kartlar.get(v.inceleyen!)!;
       const son = adimlar.filter((s) => s.asama_id === a.id && s.tip === "inceleme" && s.ajan === kart.id).at(-1);
@@ -757,6 +762,7 @@ export class Orkestrator {
       if (r !== "ok") return r;
       if (!bulgular.length) {
         if (asama.kilitle.length) this.kilitle(fid, asama);
+        if (asama.dogrulama.some((v) => v.tip === "adr")) this.adrYaz(fid, asama);
         if (asama.tur === "gelisim") return this.gelisimSor(fid, asama);
         return "ok";
       }
@@ -782,6 +788,7 @@ export class Orkestrator {
     const dizinModu = asama.calisma_dizini === "kod";
     const cwd = path.join(d, dizinModu ? "kod" : "belgeler");
     if (asama.kilitle.length) this.kilitKaldir(fid, asama.kilitle);
+    if (asama.dogrulama.some((v) => v.tip === "adr")) this.kilitKaldir(fid, [ADR_KLASORU]);
     const istem = this.uretimIstemi(fid, asama, geriBildirim, dizinModu);
     const onceSoru = this.onceSoruTuru(f, asama, tur, geriBildirim);
     const sistem = [kart.govde.trim(), ORTAK_KURALLAR, onceSoru ? ONCE_SORU : this.soruKurallari(f, false, asama)].filter(Boolean).join("\n\n");
@@ -919,6 +926,12 @@ export class Orkestrator {
       denetimler.push({ ad: v.ad, calis: () => {
         const p = planCikar(belge(), v.gelistiriciler);
         return p.kalemler ? { ozet: `${p.kalemler.length} kalem: ${p.kalemler.map((k) => k.id).join(" → ")}` } : { hatalar: p.hatalar };
+      } });
+    }
+    for (const v of asama.dogrulama.filter((x) => x.tip === "adr")) {
+      denetimler.push({ ad: v.ad, calis: () => {
+        const r = adrCikar(belge(), { en_az: v.adr_en_az, zorunlu: v.adr_zorunlu });
+        return r.adrler ? { ozet: `${r.adrler.length} ADR: ${r.adrler.map((a) => `${a.id} ${a.baslik}`).join(", ")}` } : { hatalar: r.hatalar!.slice(0, 12) };
       } });
     }
     for (const v of asama.dogrulama.filter((x) => x.tip === "atif")) {
@@ -1086,6 +1099,8 @@ export class Orkestrator {
       if (asama.salt_okunur) p.push("BU AŞAMA SALT OKUNUR: hiçbir dosya yazma ya da değiştirme. Yaptığın her değişiklik sistemce geri alınır ve ihlal sayılır.");
       if (asama.yazabilir.length) p.push("YAZMA ALANIN (yalnızca buraya yazabilirsin; dışındaki her değişiklik sistemce geri alınır ve ihlal olarak kaydedilir): " + asama.yazabilir.map((y) => `\`${klasorGibi(y)}\``).join(", "));
       if (kilitli.length) p.push("KİLİTLİ (yalnızca okunur; değiştirirsen sistem geri alır ve ihlal olarak kaydeder): " + kilitli.map((k) => `\`${k}\``).join(", "));
+      const adrler = this.adrOku(fid);
+      if (adrler.length && kilitli.includes(ADR_KLASORU)) p.push(`MİMARİ KARARLAR \`${ADR_KLASORU}/\` altında (${adrler.map((x) => x.id).join(", ")}): koda başlamadan oku ve uy. Bir karar işini engelliyorsa kodu bükme; bunu belgende söyle.`);
       p.push("Mevcut dosyalar: " + (dosyalar.length ? dosyalar.slice(0, 80).map((x) => `\`${x}\``).join(", ") : "(boş)"));
     }
     if (geriBildirim) {
@@ -1547,6 +1562,30 @@ export class Orkestrator {
   }
 
   // ------------------------------ etkin aşama listesi ------------------------------
+  /** Onaylanan ADR'leri kod/adr/ altına Markdown olarak yazar ve kilitler: yazılımcılar okur, değiştiremez.
+   *  Aşama yeniden çalışırsa (geri gönderme, yeni sürüm) kilit kalkar, klasör yeniden yazılır. */
+  private adrYaz(fid: string, asama: Asama): void {
+    const r = adrCikar(this.belgeOku(fid, asama.cikti));
+    if (!r.adrler) return;
+    const klasor = path.join(this.calisma, fid, "kod", ADR_KLASORU);
+    fs.rmSync(klasor, { recursive: true, force: true });
+    fs.mkdirSync(klasor, { recursive: true });
+    const tarih = simdi().slice(0, 10);
+    const satirlar = ["# Mimari karar kayıtları", "", "| ADR | Karar | Alan |", "|---|---|---|"];
+    for (const a of r.adrler) {
+      fs.writeFileSync(path.join(klasor, adrDosyaAdi(a)), adrMarkdown(a, tarih));
+      satirlar.push(`| [${a.id}](${adrDosyaAdi(a)}) ${a.baslik} | ${a.karar} | ${a.alan} |`);
+    }
+    fs.writeFileSync(path.join(klasor, "README.md"), satirlar.join("\n") + "\n");
+    atomikYaz(this.adrYolu(fid), JSON.stringify(r.adrler, null, 2));
+    this.yollariKilitle(fid, [ADR_KLASORU]);
+    this.sistemAdimi(fid, asama, "ADR", "kilit", `${r.adrler.length} mimari karar kod/${ADR_KLASORU}/ altına yazıldı ve kilitlendi: ${r.adrler.map((a) => a.id).join(", ")}`);
+  }
+
+  private adrYolu(fid: string) { return path.join(this.calisma, fid, ".kovan", "adr.json"); }
+
+  adrOku(fid: string): Adr[] { return jsonOku<Adr[]>(this.adrYolu(fid), []); }
+
   private planYolu(fid: string) { return path.join(this.calisma, fid, ".kovan", "plan.json"); }
 
   private planOku(fid: string): PlanKaydi | null {

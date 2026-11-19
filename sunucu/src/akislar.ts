@@ -10,10 +10,11 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import type { AjanKarti } from "./kartlar.js";
+import { ADR_ALANLARI } from "./plan.js";
 import type { AkisAsamaOzeti, AkisOzeti, AsamaTuru } from "./tipler.js";
 
 export interface Dogrulayici {
-  tip: "komut" | "ajan" | "plan" | "atif";
+  tip: "komut" | "ajan" | "plan" | "atif" | "adr";
   ad: string;
   komut: string | null;
   inceleyen: string | null;
@@ -22,6 +23,8 @@ export interface Dogrulayici {
   atlanabilir: boolean;          // onaycı bu fikirde "alanım yok" dediyse sonraki aşamalarda atlanır
   gelistiriciler: string[];      // tip: plan -> planda izin verilen yazılımcılar
   taraf: string | null;          // kalem adımında: yalnızca bu taraftaki kalemlerde (ör. fe) çalışır
+  adr_en_az: number;             // tip: adr -> en az kaç ADR
+  adr_zorunlu: string[];         // tip: adr -> bu alanlarda birer ADR zorunlu (ör. calisma_bicimi)
 }
 
 export interface KalemBilgisi {
@@ -107,12 +110,18 @@ function ajanAsamasiOku(dosya: string, ham: Record<string, any>, a: Asama, kartl
   (ham.dogrulama ?? []).forEach((d: Record<string, any>, j: number) => {
     if (!d || typeof d !== "object") throw new Error(`${yer}: ${j + 1}. doğrulayıcı geçersiz`);
     if (d.taraf && !sablon) throw new Error(`${yer}: 'taraf' koşulu yalnızca kalem adımlarında kullanılır`);
-    const ortak = { komut: null, inceleyen: null, odak: "", atlanabilir: false, gelistiriciler: [] as string[], taraf: d.taraf ? String(d.taraf) : null };
+    const ortak = { komut: null, inceleyen: null, odak: "", atlanabilir: false, gelistiriciler: [] as string[], taraf: d.taraf ? String(d.taraf) : null,
+      adr_en_az: 0, adr_zorunlu: [] as string[] };
     if (d.komut) {
       if (a.calisma_dizini !== "kod") throw new Error(`${yer}: komut doğrulaması için calisma_dizini: kod gerekli`);
       a.dogrulama.push({ ...ortak, tip: "komut", ad: String(d.ad ?? "Kontrol"), komut: String(d.komut), sure_dk: Number(d.sure_dk ?? 5) });
     } else if (d.plan) {
       a.dogrulama.push({ ...ortak, tip: "plan", ad: String(d.ad ?? "Plan biçimi"), sure_dk: 0 });
+    } else if (d.adr) {
+      const o = typeof d.adr === "object" && d.adr ? d.adr as Record<string, unknown> : {};
+      const zorunlu = (Array.isArray(o.zorunlu) ? o.zorunlu : []).map(String);
+      for (const z of zorunlu) if (!(ADR_ALANLARI as readonly string[]).includes(z)) throw new Error(`${yer}: adr.zorunlu içinde bilinmeyen alan '${z}' (${ADR_ALANLARI.join(", ")})`);
+      a.dogrulama.push({ ...ortak, tip: "adr", ad: String(d.ad ?? "ADR biçimi"), sure_dk: 0, adr_en_az: Number(o.en_az ?? 1), adr_zorunlu: zorunlu });
     } else if (d.atif) {
       a.dogrulama.push({ ...ortak, tip: "atif", ad: String(d.ad ?? "Kaynak atıfları"), sure_dk: 0 });
     } else if (d.inceleyen) {
@@ -243,7 +252,7 @@ function asamaOzeti(s: Asama, kartlar: Map<string, AjanKarti>, gelistiriciler: s
     girdiler: s.girdiler, cikti: s.cikti, salt_okunur: s.salt_okunur,
     kilitle: s.kilitle, yazabilir: s.yazabilir, en_fazla_tur: s.en_fazla_tur,
     is_kurali_sana: s.is_kurali_sana, once_soru: s.once_soru,
-    dogrulama: s.dogrulama.map((d) => ({ ad: d.ad, tip: d.tip, komut: d.komut, inceleyen: d.inceleyen, inceleyen_ad: ad(d.inceleyen), atlanabilir: d.atlanabilir, taraf: d.taraf })),
+    dogrulama: s.dogrulama.map((d) => ({ ad: d.ad, tip: d.tip, komut: d.komut, inceleyen: d.inceleyen, inceleyen_ad: ad(d.inceleyen), atlanabilir: d.atlanabilir, taraf: d.taraf, adr_zorunlu: d.adr_zorunlu })),
     kalem_adimlari: s.adimlar.map((x) => asamaOzeti(x, kartlar, Object.keys(s.gelistiriciler))),
   };
 }

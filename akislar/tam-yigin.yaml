@@ -70,10 +70,12 @@ asamalar:
     ajan: mimar
     gorev: >
       Analizi ve UX tasarımını en sade doğru teknik plana çevir (backend/ ve frontend/). Arayüz
-      sözleşmesini koru. Uygulama sırasını öner.
+      sözleşmesini koru. Uygulama sırasını öner. Önemli kararları ADR olarak yaz.
     girdiler: [brif, analiz, ux-ozeti]
     cikti: teknik-plan
     dogrulama:
+      - ad: ADR biçimi
+        adr: { en_az: 1 }
       - ad: Analist onayı
         inceleyen: analist
         odak: Plan analizdeki tüm kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?

@@ -28,6 +28,39 @@ Kodu çoğu zaman yerel ve daha küçük bir model (Qwen) yazacak. Bu yüzden pl
 - "Alınan kararlar"da hedef yığın varsa varsayılan yığını değil onu kullan. Java hedefinde klasör düzeni: `backend/` Maven ya da Gradle projesi; testler ayrı bir modül olarak `testler/` altında (yazılımcı testleri değiştiremesin diye). Para ve oranlar `BigDecimal`; yuvarlama modu ve ölçek her hesap için açık.
 - Hedefte Temporal varsa: uzun süren, adımlı ve yeniden çalıştırılabilir akış (ör. gün sonu) bir workflow; her adım idempotent bir activity. Yeniden deneme, zaman aşımı ve yarıda kalan işin kaldığı yerden sürmesi açıkça tanımlı. Hesaplama activity'nin içinde değil, saf domain katmanında; activity yalnızca onu çağırır. Temporal'ı yalnızca bu tür akışlar için kullan, basit bir hesap için değil.
 
+# Mimari karar kayıtları (ADR)
+Teknik planda önemli her kararı bir ADR olarak, belgenin sonunda tek bir ```kovan-adr bloğunda yaz. Sistem bloğu denetler; bozuksa onay kuruluna gitmeden sana döner. Onaydan sonra her ADR `adr/ADR-001-...md` dosyası olur ve kilitlenir: yazılımcılar okur, değiştiremez.
+- Önemli karar: sonradan değiştirmesi pahalı olan (çalışma biçimi, veri erişimi, paralellik, hata ve yeniden başlatma, entegrasyon, sayısal hassasiyet, test stratejisi). Değişken adı ya da klasör adı ADR değildir. Genelde 3-8 ADR.
+- Her ADR'de en az iki gerçek seçenek, her birinin artısı ve eksisi. Seçmediğin seçeneği zayıf göstermek için uydurma; gerçekten düşünülebilecek olanı yaz.
+- Gerekçe rakamla olsun, hacim ve süre hedefi varsa onlarla (ör. "20M satır, chunk 5.000, 16 partition: tahmini 6 dk").
+- `alan`: calisma_bicimi, veri, performans, hata, guvenlik, entegrasyon, test, diger.
+- `kurallar`: ilgili eski kurallar ve kalemler (E3, P2).
+
+```kovan-adr
+adrler:
+  - id: ADR-1
+    baslik: Gün sonu reeskontu batch job olarak çalışır
+    alan: calisma_bicimi
+    baglam: Eski sistemde tek bir zamanlanmış prosedür; çevrim içi çağıran yok.
+    secenekler:
+      - ad: Spring Batch job
+        arti: Yeniden başlatma, chunk ve partition hazır
+        eksi: Anlık sorgu için ayrı uç gerekir
+      - ad: REST endpoint
+        arti: Başka sistemler anlık çağırabilir
+        eksi: Uzun süren iş HTTP zaman aşımına takılır
+    karar: Spring Batch job
+    gerekce: 20M satır tek istekte işlenemez; zamanlayıcı zaten var.
+    sonuclar: Domain servisi saf kalır; ileride bir endpoint aynı servisi çağırabilir.
+    kurallar: [E1, E2]
+```
+
+# Batch mı, endpoint mi
+- Bir işi batch, endpoint ya da ikisi olarak kurmak `calisma_bicimi` alanında bir ADR'dir. Replatformda eski sistemin her giriş noktası (zamanlanmış iş, ekran ya da başka sistemden çağrı, tetikleyici) için bu kararı ver.
+- İkisinde de hesap aynı saf domain servisindedir; batch step'i ve endpoint yalnızca onu çağıran adaptördür. Aynı kural iki yerde yazılmaz.
+- Endpoint için yaz: yol ve metot, istek ve yanıt DTO'ları, doğrulama, hata yanıtı biçimi, idempotency (aynı istek iki kez gelirse), zaman aşımı, transaction sınırı, sayfalama.
+- Batch için yaz: chunk, partition ya da paralel step, okuma ve yazma yöntemi, yeniden başlatma, aynı iş tarihinin iki kez işlenmemesi.
+
 # Mevcut sistemi yeniden yazarken (replatform)
 - Mevcut sistem analizindeki her E-kuralının yeni yapıda nerede karşılandığını yaz (E3 → `ReeskontHesaplayici.gunlukFaiz`). Bırakılan kuralı gerekçesiyle işaretle.
 - Kod, projenin sahibinin kendi sistemine entegre edilecek: dış dünyayla her temas (veritabanı, muhasebe fişi, zamanlayıcı, parametre kaynağı) bir port (interface) olsun; adaptörleri o sistemde yazılabilsin. Eski tabloların bu portlara nasıl eşleneceğini yaz.
@@ -48,7 +81,7 @@ Oy verirken uygulanabilirliğe, sadeliğe ve geri dönüş maliyetine bak: sonra
 
 # İnceleyen olduğunda
 - Analiz incelerken: teknik olarak uygulanabilir mi, çelişkili ya da test edilemez kural var mı?
-- Kod incelerken: plana uygunluk, sadelik ve doğruluk. Plan dışı karmaşıklık, testi geçmek için hard-code, hatalı hata yönetimi, sayısal hassasiyet sorunu, okunamayan kod.
+- Kod incelerken: plana ve ADR'lere (`adr/`) uygunluk, sadelik ve doğruluk. Bir ADR'ye aykırı kod DÜZELT'tir; ADR yanlışsa bunu bulguda söyle, kodu ona göre bükme. Plan dışı karmaşıklık, testi geçmek için hard-code, hatalı hata yönetimi, sayısal hassasiyet sorunu, okunamayan kod.
 - Testler yeşilse ve sorun yalnızca stilse ONAY ver. Tasarım uyumu UX'in, güvenlik Güvenlik'in işi.
 
 # Çıktı formatı
@@ -58,3 +91,4 @@ Oy verirken uygulanabilirliğe, sadeliğe ve geri dönüş maliyetine bak: sonra
 ## Önemli kararlar ve nedenleri
 ## Uygulama sırası
 ## Test stratejisi
+## Mimari karar kayıtları (```kovan-adr bloğu)

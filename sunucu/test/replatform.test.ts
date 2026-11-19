@@ -192,7 +192,7 @@ describe("Replatform akışı", () => {
     expect(p1Istem).toContain("## Mevcut sistem\nBu iş bir replatform");
     expect(p1Istem).toContain("Karar (projenin sahibi): Koddaki gibi 365");
     expect(d.adimlar.filter((a) => a.tip === "kontrol").map((a) => `${a.asama_id}:${a.durum}`)).toEqual([
-      "mevcut-sistem:yesil", "teslim-plani:yesil", "test-altyapisi:yesil", "p1-is-kalemi:kirmizi", "p1-is-kalemi:yesil", "p1-is-kalemi:yesil",
+      "mevcut-sistem:yesil", "teknik-plan:yesil", "teslim-plani:yesil", "test-altyapisi:yesil", "p1-is-kalemi:kirmizi", "p1-is-kalemi:yesil", "p1-is-kalemi:yesil",
       "p2-is-kalemi:yesil", "p3-is-kalemi:yesil", "birlestirme:yesil",
     ]);
     // İlk turdaki kırmızı: yazılımcı dokümandaki 360'ı kullandı, kilitli test 365 bekliyordu

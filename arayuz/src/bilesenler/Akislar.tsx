@@ -7,6 +7,7 @@ function AdimGovdesi({ s }: { s: AkisAsamaOzeti }) {
   const testler = s.dogrulama.filter((d) => d.tip === "komut");
   const plan = s.dogrulama.some((d) => d.tip === "plan");
   const atif = s.dogrulama.some((d) => d.tip === "atif");
+  const adr = s.dogrulama.find((d) => d.tip === "adr");
   const kurul = s.dogrulama.filter((d) => d.tip === "ajan");
   const kurulAdi = (k: AkisAsamaOzeti["dogrulama"][number]) =>
     (k.inceleyen_ad ?? k.ad) + (k.atlanabilir ? " (konu yoksa atlanır)" : "") + (k.taraf ? ` (yalnızca ${k.taraf.toUpperCase()} kalemlerinde)` : "");
@@ -28,6 +29,8 @@ function AdimGovdesi({ s }: { s: AkisAsamaOzeti }) {
       {s.salt_okunur && <p className="asama-sinir">Salt okunur: hiçbir dosyaya yazamaz, yalnızca okur ve belgesini yazar.</p>}
       {atif && <p>Sistem denetimi: her kod atfı (<code>kaynak/dosya:satır</code>) gerçek bir dosya ve satıra gitmeli; uydurma atıf onay kuruluna gitmeden geri döner.</p>}
       {plan && <p>Sistem denetimi: <code>kovan-plan</code> bloğu (kalem kimlikleri, yazılımcı, bağımlılık, döngü). Bozuksa onay kurulu harcanmaz.</p>}
+      {adr && <p>Sistem denetimi: <code>kovan-adr</code> bloğu; her mimari karar en az iki seçenekle, artısı, eksisi ve gerekçesiyle
+        {adr.adr_zorunlu.length > 0 && <> (zorunlu: {adr.adr_zorunlu.map((z) => <code key={z}>{z}</code>)})</>}. Onaydan sonra <code>adr/</code> altına yazılır ve kilitlenir.</p>}
       {testler.length > 0 && <p>Testler: {testler.map((t) => <code key={t.ad}>{t.komut}</code>)}</p>}
       {kurul.length > 0 && <p>Onay kurulu: {kurul.map(kurulAdi).join(", ")}. En fazla {s.en_fazla_tur} tur.</p>}
     </>

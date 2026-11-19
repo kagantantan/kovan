@@ -174,6 +174,25 @@ export interface GelisimOnerisi {
   oncelik: string;       // yuksek, orta, dusuk
 }
 
+/** Mimari karar kaydı (ADR): Mimar teknik planda ```kovan-adr bloğuyla yazar; onaydan sonra kod/adr/ altına dosya olarak çıkar. */
+export interface AdrSecenegi {
+  ad: string;
+  arti: string;
+  eksi: string;
+}
+
+export interface Adr {
+  id: string;            // ADR-1, ADR-2...
+  baslik: string;
+  alan: string;          // calisma_bicimi, veri, performans, hata, guvenlik, entegrasyon, test, diger
+  baglam: string;
+  secenekler: AdrSecenegi[];
+  karar: string;         // seçilen seçeneğin adı
+  gerekce: string;
+  sonuclar: string;
+  kurallar: string[];    // ilgili kurallar ve kalemler (E3, P2...)
+}
+
 export type GelisimKarari = "al" | "degistir" | "simdilik_hayir" | "asla";
 
 /** Gelişim defteri: önerilere senin kararların. Sonraki sürümlerde PO bunlara bakar. */
@@ -247,6 +266,7 @@ export interface FikirDetayi {
   kararlar: Karar[];
   plan: PlanKalemiGorunumu[] | null;
   gelisim: GelisimKaydi[];
+  adrler: Adr[];
   sonraki_surum_metni: string | null;   // kabul edilen gelişim önerileri varsa yeni sürümün tohum metni
   dosyalar: { belgeler: DosyaBilgisi[]; incelemeler: DosyaBilgisi[]; kod: DosyaBilgisi[]; kaynak: DosyaBilgisi[] };
   onizlemeler: { ad: string; yol: string }[];
@@ -347,7 +367,7 @@ export interface AkisAsamaOzeti {
   en_fazla_tur: number;
   is_kurali_sana: boolean;
   once_soru: boolean;
-  dogrulama: { ad: string; tip: "komut" | "ajan" | "plan" | "atif"; komut: string | null; inceleyen: string | null; inceleyen_ad: string | null; atlanabilir: boolean; taraf: string | null }[];
+  dogrulama: { ad: string; tip: "komut" | "ajan" | "plan" | "atif" | "adr"; komut: string | null; inceleyen: string | null; inceleyen_ad: string | null; atlanabilir: boolean; taraf: string | null; adr_zorunlu: string[] }[];
   kalem_adimlari: AkisAsamaOzeti[];   // tur: kalemler ise her kalem için tekrarlanan adımlar
 }
 

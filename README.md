@@ -380,6 +380,31 @@ Ardından **Birleştirme** (uçtan uca senaryolar ve bütün testler), **Teslim 
 
 Teslimde bir kaleme geri gönderirsen yalnızca o kalem yeniden çalışır, sonrakiler yeniden doğrulanır. Teslim planına geri gönderirsen kalemler yeni plandan açılır; değişmeyen kalemler yeniden yazılmaz.
 
+### Mimari karar kayıtları (ADR)
+
+Standart, tam yığın ve replatform akışlarında Mimar, teknik planda önemli her kararı bir ADR olarak yazar: bağlam, **en az iki seçenek** (her birinin artısı ve eksisi), karar, rakamlı gerekçe, sonuçlar ve ilgili kurallar (E3, P2).
+
+```
+Teknik plan ── ```kovan-adr bloğu
+   │
+   ├─ Sistem denetimi "ADR biçimi" (makine; onay kurulundan önce)
+   │    iki seçenek yok, karar bir seçeneğin adı değil, zorunlu alan eksik → mimara geri döner
+   │
+   ├─ Onay kurulu (Analist, MSA, Güvenlik...)
+   │
+   └─ Onaydan sonra: kod/adr/ADR-001-....md + adr/README.md (dizin) → KİLİTLİ
+         yazılımcılar istemlerinde "MİMARİ KARARLAR adr/ altında" görür, değiştiremez
+         kod incelemesinde Mimar koda ADR'lere göre bakar; aykırı kod DÜZELT'tir
+```
+
+| Akış | Kural |
+|---|---|
+| Replatform | En az 2 ADR; biri `calisma_bicimi` alanında olmak zorunda: eski sistemin her giriş noktası **batch job mı, REST endpoint mi, ikisi mi** |
+| Standart, Tam yığın | En az 1 ADR |
+| Mini | Teknik plan yok, ADR yok |
+
+ADR'ler fikir ekranında **ADR** sekmesinde, seçilen seçenek işaretli olarak görünür. Teknik plan yeniden çalışırsa (geri gönderme, yeni sürüm) kilit kalkar ve `adr/` yeniden yazılır. Alanlar: `calisma_bicimi`, `veri`, `performans`, `hata`, `guvenlik`, `entegrasyon`, `test`, `diger`. Akış dosyasında: `- adr: { en_az: 2, zorunlu: [calisma_bicimi] }`.
+
 ---
 
 ## Gelişim önerileri ve yeni sürüm
@@ -431,6 +456,7 @@ Yeni fikirde **Replatform** akışını seç; **Mevcut sistem** alanına bu maki
 - **Uydurma atıf geri döner.** Mevcut sistem analizindeki her atfı sistem denetler: dosya var mı, o satırlar var mı. Atıfsız ya da uydurma atıflı analiz onay kuruluna gitmeden düzeltmeye döner. Belgelerdeki atıflar tıklanır: eski sistemin o satırları **Mevcut sistem** sekmesinde vurgulanarak açılır, iddiayı kodla yan yana doğrularsın.
 - **Farklar karara bağlanır.** Doküman gün esasını 360, kod 365 diyorsa bu bir FARK'tır. Hedef analizde hangisinin geçerli olduğunu ekip oylar; anlaşamazsa soru oylarla sana gelir. Üretimdeki davranışı değiştiren her karar karar defterinde kalır.
 - **Eşdeğerlik ayrı bir onay.** MSA, hedef analizden koda kadar her aşamada "korunan kural eskisiyle aynı mı davranıyor?" diye bakar: yuvarlama, gün sayımı, sıralama, boş ve negatif durumlar.
+- **Batch mı, endpoint mi kararı ADR'dir.** Eski sistemin her giriş noktası (zamanlanmış iş, ekrandan ya da başka sistemden çağrı) için Mimar `calisma_bicimi` ADR'si yazar; batch step'i de endpoint de aynı saf domain servisini çağırır, kural iki yerde yazılmaz.
 - **Altın test.** `kaynak/` altında eski sistemin örnek girdisi ve çıktısı varsa (ör. `girdi.csv`, `beklenen.csv`), birleştirme yeni kodu onunla koşar ve sonucu satır satır karşılaştırır. Anonimleştirilmiş birkaç günlük örnek koyman en güçlü güvencedir.
 
 ![Analizdeki atfa tıklayınca eski sistemin satırları açılır](docs/replatform-atif.png)
@@ -443,7 +469,7 @@ Yeni fikirde seçersen karar defterine yazılır ve bütün ajanlar ona uyar. Se
 | Java 21 + Spring Boot (Maven) | yaygın LTS; para ve oran BigDecimal, iş mantığı saf domain'de (hexagonal) |
 | Java 25 + Spring Boot (Maven) | yeni LTS'e geçtiysen |
 | Java 21 + Spring Boot + Temporal | iş uzun, çok adımlı ve kesintide kaldığı yerden sürmesi gerekiyorsa |
-| Java 17 + Spring Batch (Oracle) | milyonlarca kayıtlı gün sonu işi; chunk, partitioning ve yeniden başlatma Spring Batch'te, kararları mimar rakamla verir |
+| Java 17 + Spring Batch / REST (Oracle) | milyonlarca kayıtlı gün sonu işi ya da çevrim içi servis; her giriş noktasının batch mı endpoint mi olacağını mimar ADR ile seçer; chunk, partitioning ve yeniden başlatma kararlarını rakamla verir |
 | Node.js + TypeScript | Kovan'ın varsayılanı |
 | Başka bir yığın | serbest metin, ör. "Java 17 + Spring Boot 3, Gradle" |
 
@@ -702,6 +728,7 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 |---|---|
 | "Node.js eski" | [nodejs.org](https://nodejs.org)'dan LTS sürümünü (22+) kur |
 | "Paket kurulumu başarısız" | İnternet bağlantını kontrol et; Terminal'de `npm install` çalıştırıp hatayı gör |
+| "ADR biçimi: GEÇERSİZ" | Mimar'ın `kovan-adr` bloğu eksik ya da bozuk; sistem bulguyu mimara geri gönderir, genelde bir sonraki turda düzelir. Tur sınırına gelirse bulgulardaki maddeye bak (ör. "en az iki seçenek olmalı", "'calisma_bicimi' alanında bir ADR yok") |
 | "Port 8765 kullanımda" | Kovan zaten açık olabilir; değilse `kovan.yaml`'da `port`'u değiştir |
 | "Yerel hazır değil: Ollama'ya ulaşılamadı" | Ollama uygulamasını aç |
 | "Model indirilmemiş" | `Ollama-Kur.command`'ı yeniden çalıştır ya da `ollama pull qwen3-coder:30b` |
@@ -742,6 +769,7 @@ Kullanım sütunu Claude Code'un tahminidir. Abonelikte faturalanmaz ama kullan�
 - [x] Replatform: mevcut sistemi koda atıflarla anlama, eşdeğerlik onayı, altın test, entegrasyon kılavuzu
 - [x] Hepsi yerel modu: kod ve belgeler makineden çıkmaz
 - [x] Kurum içi LLM: OpenAI uyumlu motor, Kovan'ın kendi ajan döngüsü, repo dışından ayar dosyası
+- [x] Mimari karar kayıtları (ADR): seçenekli, makineyle denetlenen, kodda kilitli; replatformda batch/endpoint kararı zorunlu
 - [ ] Fikir başına git deposu: tur tur diff ve geri alma
 - [ ] Deterministik güvenlik taramaları onay kurulundan önce (`npm audit`, `semgrep`, `gitleaks`)
 - [ ] Qwen Code motoru: Qwen modellerini kendi harness'ında çalıştırma seçeneği

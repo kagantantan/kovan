@@ -131,11 +131,11 @@ describe("Standart akış: derin planlama ve iş kalemleri", () => {
       expect(d.adimlar.filter((s) => s.asama_id === a && s.id < ilkKod).length, a).toBeGreaterThan(0);
     }
     expect(d.adimlar.filter((a) => a.tip === "kontrol").map((a) => `${a.asama_id}:${a.durum}`)).toEqual([
-      "teslim-plani:yesil", "test-altyapisi:yesil", "p1-is-kalemi:kirmizi", "p1-is-kalemi:yesil", "p1-is-kalemi:yesil",
+      "teknik-plan:yesil", "teslim-plani:yesil", "test-altyapisi:yesil", "p1-is-kalemi:kirmizi", "p1-is-kalemi:yesil", "p1-is-kalemi:yesil",
       "p2-is-kalemi:yesil", "p3-is-kalemi:yesil", "birlestirme:yesil",
     ]);
     expect(JSON.parse(dosya(k, fid, ".kovan/kilitler.json")).yollar).toEqual([
-      "test-be.sh", "testler/be/entegrasyon", "testler/be/p1", "testler/be/p2", "testler/be/p3", "testler/package.json",
+      "adr", "test-be.sh", "testler/be/entegrasyon", "testler/be/p1", "testler/be/p2", "testler/be/p3", "testler/package.json",
     ]);
     // Kalemin istemi kalemin kapsamını taşır; sonraki kalemin işine girmemesi söylenir
     const p2Istem = istemi(k, fid, d.adimlar.find((a) => a.asama_id === "p2-is-kalemi" && a.tip === "uret")!.id);
@@ -235,12 +235,12 @@ describe("Tam yığın akış", () => {
     expect(d.asamalar.find((a) => a.id === "p3-is-kalemi")!.onaylar.map((o) => o.kisa)).toEqual(["TEST", "ANLZ", "TKM", "KTST", "SCRT", "UX"]);
     expect(d.asamalar.find((a) => a.id === "p1-is-kalemi")!.onaylar.map((o) => o.kisa)).toEqual(["TEST", "ANLZ", "TKM", "KTST", "SCRT"]);
     expect(d.adimlar.filter((a) => a.tip === "kontrol").map((a) => `${a.asama_id}:${a.ajan_ad}:${a.durum}`)).toEqual([
-      "teslim-plani:Plan biçimi:yesil", "test-altyapisi:Altyapı çalışıyor:yesil",
+      "teknik-plan:ADR biçimi:yesil", "teslim-plani:Plan biçimi:yesil", "test-altyapisi:Altyapı çalışıyor:yesil",
       "p1-is-kalemi:Testler:kirmizi", "p1-is-kalemi:Testler:yesil", "p1-is-kalemi:Testler:yesil", "p2-is-kalemi:Testler:yesil",
       "p3-is-kalemi:Testler:kirmizi", "p3-is-kalemi:Testler:yesil", "birlestirme:BE testleri:yesil", "birlestirme:FE testleri:yesil",
     ]);
     expect(JSON.parse(dosya(k, fid, ".kovan/kilitler.json")).yollar).toEqual([
-      "tasarim", "test-be.sh", "test-fe.sh", "testler/be/entegrasyon", "testler/be/p1", "testler/be/p2",
+      "adr", "tasarim", "test-be.sh", "test-fe.sh", "testler/be/entegrasyon", "testler/be/p1", "testler/be/p2",
       "testler/fe/entegrasyon", "testler/fe/p3", "testler/package.json", "testler/playwright.config.ts",
     ]);
     expect(d.onizlemeler.map((o) => o.yol)).toEqual(["kod/tasarim/prototip.html", "kod/frontend/index.html"]);

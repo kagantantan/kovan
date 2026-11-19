@@ -1,10 +1,11 @@
 // Ajan çıktısındaki yapılandırılmış bloklar:
 //   ```kovan-plan     Proje Yöneticisi'nin teslim planı: sıralı iş kalemleri (P1, P2...) ve bağımlılıkları
 //   ```kovan-gelisim  Ürün Sahibi'nin gelişim önerileri (G1, G2...)
+//   ```kovan-adr      Mimar'ın mimari karar kayıtları (ADR-1, ADR-2...): her biri en az iki seçenekle
 // Bloklar YAML ya da JSON olabilir. Hatalar insan diliyle döner; üreten ajana bulgu olarak gider.
 import YAML from "yaml";
 import type { Asama } from "./akislar.js";
-import type { GelisimOnerisi, PlanKalemi } from "./tipler.js";
+import type { Adr, AdrSecenegi, GelisimOnerisi, PlanKalemi } from "./tipler.js";
 
 export const EN_FAZLA_KALEM = 8;
 export const EN_FAZLA_ONERI = 5;
@@ -138,4 +139,64 @@ export function gelisimCikar(belge: string): { oneriler?: GelisimOnerisi[]; hata
     oneriler.push({ id, baslik, aciklama, deger: metin(o?.deger), efor, oncelik: ONCELIKLER.has(oncelik) ? oncelik : "orta" });
   });
   return hatalar.length ? { hatalar } : { oneriler };
+}
+
+export const EN_FAZLA_ADR = 12;
+export const ADR_ALANLARI = ["calisma_bicimi", "veri", "performans", "hata", "guvenlik", "entegrasyon", "test", "diger"] as const;
+
+const sade = (s: string) => s.toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
+
+/** ```kovan-adr bloğunu okur ve denetler. zorunlu: bu alanlarda en az birer ADR olmalı (ör. replatformda calisma_bicimi). */
+export function adrCikar(belge: string, secenek: { en_az?: number; zorunlu?: string[] } = {}): { adrler?: Adr[]; hatalar?: string[] } {
+  const enAz = secenek.en_az ?? 1;
+  const govde = blokBul(belge, "kovan-adr");
+  if (govde === null) return { hatalar: ["Belgede ```kovan-adr bloğu yok. Önemli mimari kararları bu blokta ADR olarak yaz."] };
+  const l = liste(govde, "adrler");
+  if (!l.liste) return { hatalar: [`kovan-adr ${l.hata}. En az ${enAz} ADR olmalı.`] };
+  const hatalar: string[] = [];
+  if (l.liste.length < enAz) hatalar.push(`En az ${enAz} ADR olmalı (${l.liste.length} var).`);
+  if (l.liste.length > EN_FAZLA_ADR) hatalar.push(`En fazla ${EN_FAZLA_ADR} ADR olabilir (${l.liste.length} var); küçük kararları teknik planda bırak.`);
+  const adrler: Adr[] = [];
+  const idler = new Set<string>();
+  l.liste.slice(0, EN_FAZLA_ADR).forEach((a, i) => {
+    const id = metin(a?.id).toUpperCase().replace(/^ADR-?0*(\d)/, "ADR-$1");
+    const yer = id || `${i + 1}. ADR`;
+    if (!/^ADR-\d{1,3}$/.test(id)) hatalar.push(`${yer}: id ADR-1, ADR-2 biçiminde olmalı.`);
+    else if (idler.has(id)) hatalar.push(`${id}: aynı id iki kez kullanılmış.`);
+    idler.add(id);
+    const alan = metin(a?.alan).toLowerCase();
+    if (!(ADR_ALANLARI as readonly string[]).includes(alan)) hatalar.push(`${yer}: alan şunlardan biri olmalı: ${ADR_ALANLARI.join(", ")} ('${alan || "-"}' yazılmış).`);
+    for (const z of ["baslik", "baglam", "karar", "gerekce", "sonuclar"] as const) if (!metin(a?.[z])) hatalar.push(`${yer}: ${z} boş.`);
+    const ham = Array.isArray(a?.secenekler) ? (a.secenekler as Record<string, unknown>[]) : [];
+    const secenekler: AdrSecenegi[] = ham.map((s) => ({ ad: metin(s?.ad), arti: metin(s?.arti), eksi: metin(s?.eksi) }));
+    if (secenekler.length < 2) hatalar.push(`${yer}: en az iki seçenek olmalı; her biri ad, arti, eksi ile.`);
+    secenekler.forEach((s, j) => { if (!s.ad || !s.arti || !s.eksi) hatalar.push(`${yer}: ${j + 1}. seçenekte ad, arti ve eksi zorunlu.`); });
+    const karar = metin(a?.karar);
+    if (karar && secenekler.length >= 2 && !secenekler.some((s) => sade(s.ad) === sade(karar)))
+      hatalar.push(`${yer}: karar ('${karar}') seçeneklerden birinin adıyla aynı olmalı.`);
+    adrler.push({ id, baslik: metin(a?.baslik), alan, baglam: metin(a?.baglam), secenekler, karar, gerekce: metin(a?.gerekce),
+      sonuclar: metin(a?.sonuclar), kurallar: dizi(a?.kurallar).map((x) => x.toUpperCase()) });
+  });
+  for (const z of secenek.zorunlu ?? []) {
+    if (!adrler.some((a) => a.alan === z)) hatalar.push(`'${z}' alanında bir ADR yok; bu akışta zorunlu.`);
+  }
+  return hatalar.length ? { hatalar } : { adrler };
+}
+
+const dosyaAdi = (s: string) => s.toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s")
+  .replace(/ö/g, "o").replace(/ç/g, "c").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) || "karar";
+
+/** ADR'nin kod/adr/ altındaki dosyası: ADR-001-calisma-bicimi.md */
+export function adrDosyaAdi(a: Adr): string {
+  return `ADR-${a.id.replace("ADR-", "").padStart(3, "0")}-${dosyaAdi(a.baslik)}.md`;
+}
+
+/** ADR'yi okunur Markdown'a çevirir (Nygard biçimi, seçeneklerle). */
+export function adrMarkdown(a: Adr, tarih: string): string {
+  const s = [`# ${a.id}: ${a.baslik}`, "", `- Durum: Kabul edildi (${tarih})`, `- Alan: ${a.alan}`];
+  if (a.kurallar.length) s.push(`- İlgili: ${a.kurallar.join(", ")}`);
+  s.push("", "## Bağlam", a.baglam, "", "## Seçenekler");
+  for (const o of a.secenekler) s.push("", `### ${o.ad}${sade(o.ad) === sade(a.karar) ? " (seçildi)" : ""}`, `- Artı: ${o.arti}`, `- Eksi: ${o.eksi}`);
+  s.push("", "## Karar", a.karar, "", "## Gerekçe", a.gerekce, "", "## Sonuçlar", a.sonuclar, "");
+  return s.join("\n");
 }
