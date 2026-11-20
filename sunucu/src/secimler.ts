@@ -14,6 +14,9 @@ export interface AjanSecimi {
 
 const MODEL_KALIBI = /^[A-Za-z0-9._:/@+-]{1,100}$/;
 
+/** Dosyada ajan olmayan, genel seçimlerin anahtarı: { "_genel": { "model": "haiku" } } (inceleme ve oy modeli). */
+const GENEL = "_genel";
+
 export const varsayilanSecimDosyasi = (): string =>
   process.env.KOVAN_AJAN_SECIMLERI || path.join(os.homedir(), ".kovan", "ajan-secimleri.json");
 
@@ -27,6 +30,7 @@ export class AjanSecimleri {
     this.secimler = dosya ? jsonOku<Record<string, AjanSecimi>>(dosya, {}) : {};
     // Dosyadaki geçersiz seçimler (silinmiş ajan ya da motor) yok sayılır; Kovan açılmaya devam eder
     for (const [id, s] of Object.entries(this.secimler)) {
+      if (id === GENEL) continue;
       if (this.hata(id, s)) delete this.secimler[id];
       else this.uygula(id);
     }
@@ -55,7 +59,21 @@ export class AjanSecimleri {
   }
 
   secim(id: string): AjanSecimi | null {
-    return this.secimler[id] ?? null;
+    return id === GENEL ? null : this.secimler[id] ?? null;
+  }
+
+  /** Claude'daki inceleme ve oyların modeli; null: her ajan kendi modelinde. */
+  incelemeModeli(): string | null {
+    const m = this.secimler[GENEL]?.model;
+    return typeof m === "string" && MODEL_KALIBI.test(m) ? m : null;
+  }
+
+  incelemeModeliAyarla(model: string | null): void {
+    const m = (model ?? "").trim();
+    if (m && !MODEL_KALIBI.test(m)) throw new KovanHatasi(`Geçersiz model adı: '${m}'`);
+    if (m) this.secimler[GENEL] = { motor: "claude", model: m };
+    else delete this.secimler[GENEL];
+    this.kaydet();
   }
 
   ayarla(id: string, s: AjanSecimi): void {

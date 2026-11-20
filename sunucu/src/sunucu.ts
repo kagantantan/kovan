@@ -114,6 +114,8 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
   ]);
   const secimler = new AjanSecimleri(kartlar, () => [...motorlar.keys()].filter((m) => m !== "deneme"),
     secenek.ajan_secimleri === undefined ? varsayilanSecimDosyasi() : secenek.ajan_secimleri);
+  // Ekrandan seçilen inceleme modeli, dosyadaki (kovan.yaml / dış ayar) değerin üstüne yazar
+  if (secimler.incelemeModeli()) cfg.claude_inceleme_modeli = secimler.incelemeModeli();
   const depo = new Depo(calisma);
   const ork = new Orkestrator(calisma, cfg, depo, kartlar, akislar, motorlar);
 
@@ -150,7 +152,7 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     const durumlar: DurumYaniti["motorlar"] = {};
     for (const [ad, m] of motorlar) durumlar[ad] = await m.durumOzeti();
     return {
-      surum, varsayilan_motor: cfg.motor, calisma, paralel_fikir: cfg.paralel_fikir, paralel_inceleme: cfg.paralel_inceleme,
+      surum, varsayilan_motor: cfg.motor, calisma, paralel_fikir: cfg.paralel_fikir, paralel_inceleme: cfg.paralel_inceleme, claude_inceleme_modeli: cfg.claude_inceleme_modeli,
       ajan_sorulari: cfg.ajan_sorulari, en_fazla_soru_turu: cfg.en_fazla_soru_turu, motorlar: durumlar,
       hedef_yiginlar: HEDEF_YIGINLAR,
       ornek_kaynak: fs.existsSync(path.join(kok, "ornekler", "reeskont-eski")) ? path.join(kok, "ornekler", "reeskont-eski") : null,
@@ -193,6 +195,13 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     const g = govde(req.body);
     secimler.ayarla(req.params.id, { motor: metin(g.motor), model: metin(g.model) });
     return { ok: true };
+  });
+  // Tasarruf: Claude'daki incelemeler ve oylar ucuz modelle (ör. haiku); "" = her ajan kendi modelinde
+  app.post("/api/inceleme-modeli", async (req) => {
+    const model = metin(govde(req.body).model).trim();
+    secimler.incelemeModeliAyarla(model || null);
+    cfg.claude_inceleme_modeli = model || null;
+    return { ok: true, model: cfg.claude_inceleme_modeli };
   });
   app.post<{ Params: { id: string } }>("/api/ajanlar/:id/secim-sil", async (req) => { secimler.kaldir(req.params.id); return { ok: true }; });
   // Seçim ekranı için öneri listesi: Claude takma adları ve OpenAI uyumlu motorların sunucudaki modelleri

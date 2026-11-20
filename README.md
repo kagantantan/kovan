@@ -554,7 +554,7 @@ motorlar:
   qwen-yerel: { tur: openai, adres: http://127.0.0.1:11434/v1, model: qwen3:8b, baglam_token: 32768 }
 ```
 
-Ollama'yı bağlamı büyüterek başlat: `OLLAMA_CONTEXT_LENGTH=32768 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve`. 16 GB'lık bir Mac'te 8-9B model ve 32k bağlam sığar; büyük replatform belgeleri bu bağlamı aşabilir, küçük işlerle başla.
+Yerel adresteki (`127.0.0.1`, `localhost`) bir motora aynı anda **tek** ajan çağrısı gider, diğerleri sırada bekler ve süreleri sıraları gelince başlar (Ollama tek istek işler). Kurum sunucusunda varsayılan 4; motor ayarında `es_zamanli` ile değişir. 8B bir model M1'de bir belgeyi 10-20 dakikada yazar; dış ayarda `ajanlar: { "*": { sure_dk: 45 } }` ile süre sınırını büyüt. Ollama'yı bağlamı büyüterek başlat: `OLLAMA_CONTEXT_LENGTH=32768 OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve`. 16 GB'lık bir Mac'te 8-9B model ve 32k bağlam sığar; büyük replatform belgeleri bu bağlamı aşabilir, küçük işlerle başla.
 
 Ollama değişkenlerini (`ANTHROPIC_BASE_URL` vb.) `~/.zshrc`'ye ya da `~/.claude/settings.json`'a yazma. Kovan bunları yalnızca yerel ajanların çağrısına koyar, Claude ajanları için temizler. `settings.json`'daki değerler ise Kovan'ın ayarını ezer.
 
@@ -675,6 +675,7 @@ Dış dosyada yazdığın her üst anahtar repodaki `kovan.yaml`'ın aynı anaht
 
 **Ajanlar** ekranında her ajanın altında **Motor** (Claude ya da `kovan.yaml`'daki bir motor, ör. `qwen-yerel`) ve **Model** (Claude: `sonnet`, `opus`, `haiku`; Ollama: sunucudaki modeller listelenir) seçilir. **Kaydet** sonraki ajan çağrısından itibaren geçerlidir; **Varsayılana dön** kartın değerine döner.
 
+- **İncelemeler ve oylar (Claude)**: Ajanlar ekranının üstündeki seçim, Claude'daki onay kurulu incelemelerini ve ekip oylarını daha ucuz bir modelle (ör. `haiku`) çalıştırır; belgeleri, planları ve kodu yazan çağrılar ajanın kendi modelinde kalır. Claude kullanımının yaklaşık yarısı incelemelerden gelir. Dosyada: `kovan.yaml` → `claude_inceleme_modeli: haiku`.
 - Seçim **Hibrit** modda geçerlidir. **Hepsi Claude** ve **Hepsi yerel** bütün ajanları tek motora alır.
 - Sıra: kart (`ajanlar/*.md`) < dış ayar (`ajanlar:`) < ekran seçimi. Yalnızca motor ve model değişir; araçlar, izinler ve sistem istemi kartta kalır.
 - Seçimler repo dışında, `~/.kovan/ajan-secimleri.json`'da durur (`KOVAN_AJAN_SECIMLERI` ile başka bir yol).
@@ -757,6 +758,7 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 | "Paket kurulumu başarısız" | İnternet bağlantını kontrol et; Terminal'de `npm install` çalıştırıp hatayı gör |
 | "Çalışan bir fikir silinemez; önce durdur." | Fikir ekranında **Durdur**, sonra **Sil** |
 | "İstem modelin bağlamına sığmıyor" | Yerel ya da kurum modelinin bağlamı bu aşamanın girdisine yetmiyor; Kovan istemi kırptırmak yerine durdu. Daha büyük bağlamlı model kullan (motor ayarında `baglam_token`'ı da güncelle) ya da aşamayı Hibrit modda Claude'a ver |
+| İş kalemi tur sınırında ve yazılımcı "Test şüphesi" bildiriyor (kilitli testin kendisi hatalı) | **Kabul testine geri gönder**'i seç ve testte neyin yanlış olduğunu nota yaz. Kalemin kabul testi notla yeniden açılır, Test Otomasyon düzeltir, onay kurulu bakar, test yeniden kilitlenir; yazılan kod korunur ve iş kalemi yeniden doğrulanır. Kilitli testi elle değiştirme: Kovan geri alır |
 | "Belge bütünlüğü: GEÇERSİZ" | Ajan revizyonda belgeyi kısmen ya da baştan yazdı; önceki sürüm geri kondu, bulgu ajana döndü. Genelde sonraki turda düzelir |
 | "ADR biçimi: GEÇERSİZ" | Mimar'ın `kovan-adr` bloğu eksik ya da bozuk; sistem bulguyu mimara geri gönderir, genelde bir sonraki turda düzelir. Tur sınırına gelirse bulgulardaki maddeye bak (ör. "en az iki seçenek olmalı", "'calisma_bicimi' alanında bir ADR yok") |
 | "Port 8765 kullanımda" | Kovan zaten açık olabilir; değilse `kovan.yaml`'da `port`'u değiştir |

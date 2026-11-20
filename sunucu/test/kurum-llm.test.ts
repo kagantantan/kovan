@@ -9,6 +9,8 @@ import { bashIzni, komutParcala, yolCoz } from "../src/ajan/araclar.js";
 import { ajanDongusu, baglamKirp, metindenCagrilar, sonMetin, type BaglantiAyari, type DonguIstegi } from "../src/ajan/dongu.js";
 import { ayarlariYukle } from "../src/ayarlar.js";
 import { BellekKasasi } from "../src/kasa.js";
+import type { AjanCagrisi } from "../src/motor.js";
+import { UyumluMotor } from "../src/uyumlu.js";
 import { bekle, bekliyor, geciciKok, KOK, kovanOlustur, ORNEK_MINI } from "./yardimci/ortam.js";
 
 // ------------------------------------------------------------------------------------------
@@ -481,5 +483,66 @@ describe("Ayarlar ekranı: API anahtarı", () => {
     expect(baskaKoken.statusCode).toBe(403);
     expect(await k.motorlar.get("kurum-llm")!.durumOzeti()).toMatchObject({ hazir: false, anahtar_kaynagi: null });
     await k.ork.kapat();
+  });
+});
+
+// ------------------------------------------------------------------------------------------
+describe("Yerel sunucuda eşzamanlılık", () => {
+  /** /v1/models ve /chat/completions'ı gecikmeli yanıtlayan sunucu; aynı anda kaç üretim isteği işlendiğini sayar. */
+  async function yavasSunucu(gecikmeMs: number) {
+    const sayac = { simdi: 0, enFazla: 0, models: 0 };
+    const sunucu = http.createServer((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        const models = req.url === "/v1/models";
+        if (models) sayac.models++;
+        else { sayac.simdi++; sayac.enFazla = Math.max(sayac.enFazla, sayac.simdi); }
+        setTimeout(() => {
+          if (!models) sayac.simdi--;
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify(models ? { data: [{ id: "qwen-test" }] }
+            : { choices: [{ message: { role: "assistant", content: "Tamam." }, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 1 } }));
+        }, gecikmeMs);
+      });
+    });
+    await new Promise<void>((coz) => sunucu.listen(0, "127.0.0.1", coz));
+    const adres = `http://127.0.0.1:${(sunucu.address() as { port: number }).port}/v1`;
+    sunucular.push({ adres, istekler: [], kapat: () => new Promise((coz) => { sunucu.closeAllConnections(); sunucu.close(() => coz()); }) });
+    return { adres, sayac };
+  }
+  const cagri = (cwd: string): AjanCagrisi => ({
+    rol: "analist", asama_id: "analiz", gorev_turu: "inceleme", sistem: "Test.", istem: "Kısa yanıt ver.", model: "qwen-test",
+    araclar: [], izinli: [], cwd, sure_sn: 60, sistem_modu: "ekle", butce_usd: null, sema: null, efor: null,
+  });
+
+  it("aynı anda gelen sağlık denetimleri tek denetimi bekler; hiçbiri yarım sonuçla 'hazır değil' görmez", async () => {
+    const { adres, sayac } = await yavasSunucu(150);
+    const m = new UyumluMotor("qwen-yerel", { tur: "openai", adres, model: "qwen-test" });
+    expect(await Promise.all([m.saglik(true), m.saglik(), m.saglik()])).toEqual([true, true, true]);
+    expect(sayac.models).toBe(1);
+  });
+
+  it("es_zamanli: yerel sunucuya aynı anda en fazla bu kadar çağrı gider, fazlası sırada bekler", async () => {
+    const { adres, sayac } = await yavasSunucu(300);
+    const tekli = new UyumluMotor("qwen-yerel", { tur: "openai", adres, model: "qwen-test", es_zamanli: 1 });
+    const sonuclar = await Promise.all([1, 2, 3].map(() => tekli.calistir(cagri(gecici()))));
+    expect(sonuclar.map((r) => r.ok)).toEqual([true, true, true]);
+    expect(sayac.enFazla).toBe(1);
+
+    sayac.enFazla = 0;
+    const ikili = new UyumluMotor("kurum", { tur: "openai", adres, model: "qwen-test", es_zamanli: 2 });
+    await Promise.all([1, 2, 3].map(() => ikili.calistir(cagri(gecici()))));
+    expect(sayac.enFazla).toBe(2);
+  });
+
+  it("varsayılan: yerel adreste 1, uzak adreste 4", () => {
+    const yaz = (adres: string) => {
+      const d = gecici();
+      fs.writeFileSync(path.join(d, "a.yaml"), `motorlar:\n  m:\n    tur: openai\n    adres: ${adres}\n    model: x\n`);
+      return (ayarlariYukle(KOK, path.join(d, "a.yaml")).motorlar.m as { es_zamanli: number }).es_zamanli;
+    };
+    expect(yaz("http://127.0.0.1:11434/v1")).toBe(1);
+    expect(yaz("http://localhost:1234/v1")).toBe(1);
+    expect(yaz("https://llm.kurum.local/v1")).toBe(4);
   });
 });

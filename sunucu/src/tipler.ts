@@ -321,6 +321,7 @@ export interface DurumYaniti {
   calisma: string;
   paralel_fikir: number;
   paralel_inceleme: boolean;
+  claude_inceleme_modeli: string | null;
   ajan_sorulari: boolean;
   en_fazla_soru_turu: number;
   ortak_karar: { acik: boolean; kurul: { id: string; ad: string; kisa: string }[]; kural: "oybirligi" | "cogunluk" };

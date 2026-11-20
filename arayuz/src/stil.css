@@ -666,3 +666,7 @@ button.adim-satir:hover { background: var(--duman); }
 .olcu-secim { font: inherit; padding: 1px 4px; }
 
 .yol-sec { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+
+.inceleme-modeli { margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--cizgi); border-radius: 8px; }
+.inceleme-modeli .alan { margin: 0 0 6px; }
+.inceleme-modeli p { margin: 4px 0 0; }

@@ -59,4 +59,24 @@ describe("Onay korunur", () => {
     const { incelemeler } = await kos(false);
     expect(incelemeler).toEqual(["1:mimar", "1:test-analisti", "2:mimar", "2:test-analisti"]);
   });
+
+  it("karar verirken yazılan not karar defterine girer; onaycı onu 'Alınan kararlar'da görür", async () => {
+    const istemler: string[] = [];
+    const betik = (c: AjanCagrisi): Partial<AjanSonucu> | null => {
+      if (c.gorev_turu === "uret") return { metin: "# Analiz\nE1: tutarlar karşılaştırılır." };
+      if (c.gorev_turu !== "inceleme") return null;
+      istemler.push(c.istem);
+      return karar(c.rol === "test-analisti" && istemler.length <= 2 ? "DUZELT" : "ONAY");
+    };
+    const motorlar = new Map<string, Motor>([["deneme", new BetikMotor("deneme", betik)], ["claude", new SahteMotor("claude")], ["qwen-yerel", new SahteMotor("qwen-yerel", true)]]);
+    const k = await kovanOlustur({ kok: geciciKok({ "iki-onayci": AKIS.replace("en_fazla_tur: 3", "en_fazla_tur: 1") }), motorlar, ayar: { ajan_sorulari: false } });
+    const fid = await k.ork.yeniFikir("", ORNEK_MINI, "iki-onayci", "deneme");
+    await bekle(k, fid, bekliyor("tur_siniri"));
+    k.ork.kararVer(fid, "bir_tur_daha", "Eşdeğerlik değer eşitliğiyle karşılaştırılır; scale farkı sayılmaz.");
+    await bekle(k, fid, bekliyor("insan"));
+    expect(k.ork.kararlar(fid).at(-1)).toMatchObject({ baslik: "Projenin sahibinin notu", cevap: "Eşdeğerlik değer eşitliğiyle karşılaştırılır; scale farkı sayılmaz.", karar_veren: "insan", asama_id: "analiz" });
+    const sonInceleme = istemler.at(-1)!;
+    expect(sonInceleme).toContain("## Alınan kararlar");
+    expect(sonInceleme).toContain("Eşdeğerlik değer eşitliğiyle karşılaştırılır; scale farkı sayılmaz.");
+  });
 });

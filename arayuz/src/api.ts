@@ -37,6 +37,7 @@ export const api = {
   ajanlar: () => istek<AjanOzeti[]>("/api/ajanlar"),
   ajanSecimi: (id: string, motor: string, model: string) => istek<{ ok: true }>(`/api/ajanlar/${encodeURIComponent(id)}/secim`, { motor, model }),
   ajanSecimiSil: (id: string) => istek<{ ok: true }>(`/api/ajanlar/${encodeURIComponent(id)}/secim-sil`, {}),
+  incelemeModeli: (model: string) => istek<{ ok: true; model: string | null }>("/api/inceleme-modeli", { model }),
   modeller: () => istek<Record<string, string[]>>("/api/motorlar/modeller"),
   akislar: () => istek<AkisOzeti[]>("/api/akislar"),
   fikirler: () => istek<FikirOzeti[]>("/api/fikirler"),

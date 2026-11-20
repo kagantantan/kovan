@@ -147,6 +147,10 @@ const SECENEK_TANIM: Record<string, Omit<Secenek, "anahtar" | "onerilen">> = {
   geri_gonder: { etiket: "Notumla geri gönder", aciklama: "Seçtiğin aşama notunla yeniden çalışır; sonraki aşamalar yeniden yazılmaz, yeniden doğrulanır." },
   bir_tur_daha: { etiket: "Bir tur daha", aciklama: "Bulgularla aynı ajana bir tur daha ver." },
   claude_devral: { etiket: "Bu aşamayı Claude'a devret", aciklama: "Yerel model tıkandı; bu aşama Claude ile devam etsin." },
+  kabul_testine_don: {
+    etiket: "Kabul testine geri gönder",
+    aciklama: "Kilitli test hatalıysa: kalemin kabul testi notunla yeniden açılır. Testi Test Otomasyon düzeltir, onay kurulu bakar, test yeniden kilitlenir. Yazılan kod korunur; iş kalemi yeniden doğrulanır.",
+  },
   devam: { etiket: "Olduğu gibi kabul et", aciklama: "Bulgulara rağmen sonraki aşamaya geç." },
   tekrar_dene: { etiket: "Tekrar dene", aciklama: "Aynı adımı yeniden çalıştır (ör. giriş yaptıktan ya da Ollama'yı açtıktan sonra)." },
   atla: { etiket: "Bu aşamayı atla", aciklama: "Aşamayı çıktısı olmadan geç; sonraki aşamalar eksik girdiyle çalışabilir." },
@@ -157,7 +161,7 @@ const SECENEK_TANIM: Record<string, Omit<Secenek, "anahtar" | "onerilen">> = {
 const SECIM_ETIKET: Record<string, string> = {
   devam: "Olduğu gibi kabul edildi, devam", bir_tur_daha: "Bir tur daha verildi", tekrar_dene: "Tekrar denendi",
   atla: "Aşama atlandı", butce_artir: "Bütçe artırıldı", kabul: "Kabul edildi", geri_gonder: "Notla geri gönderildi",
-  claude_devral: "Aşama Claude'a devredildi", durdur: "Durduruldu",
+  claude_devral: "Aşama Claude'a devredildi", durdur: "Durduruldu", kabul_testine_don: "Kabul testine geri gönderildi",
 };
 
 function secenekler(anahtarlar: string[], onerilen?: string): Secenek[] {
@@ -304,6 +308,24 @@ export class Orkestrator {
     return adlar.size ? [...adlar] : ["claude"];
   }
 
+  /** İnceleme ve oy: Claude'daysa ayarlanan ucuz model (ör. haiku); belgeyi ve kodu yazan üretim çağrıları ajanın kendi modelinde kalır. */
+  private incelemeModeli(motor: Motor, kart: AjanKarti): string {
+    return motor.ad === "claude" && this.cfg.claude_inceleme_modeli ? this.cfg.claude_inceleme_modeli : motor.modelSec(kart);
+  }
+
+  /** Kalem adımının, aynı kalemde kendisinden önce gelen ve testleri kilitleyen aşaması (ör. P2 Kabul testi). */
+  private kabulTestiAsamasi(f: Fikir, asama: Asama): Asama | null {
+    if (!asama.kalem) return null;
+    const liste = this.asamalar(f);
+    const i = liste.findIndex((a) => a.id === asama.id);
+    for (let j = i - 1; j >= 0; j--) {
+      const a = liste[j];
+      if (a.kalem?.id !== asama.kalem.id) break;
+      if (a.tur === "ajan" && a.kilitle.length) return a;
+    }
+    return null;
+  }
+
   private devralinabilir(f: Fikir, asama: Asama): boolean {
     if (f.motor !== "hibrit" || !asama.ajan || !this.motorlar.has("claude")) return false;
     return this.motorSec(f, this.kartlar.get(asama.ajan)!, asama, true).yerel;
@@ -439,6 +461,13 @@ export class Orkestrator {
     const asama = asamalar[idx] ?? null;
     const g: Partial<Fikir> = { bekleme: null, durum: "sirada" };
     const notEkle = (gb: string | null) => ((gb ?? "") + (not ? `\n\n### İnsanın notu\n${not}` : "")).trim();
+    // Not bağlayıcı bir karardır: yalnızca üreticiye değil, onaycılara ve sonraki bütün aşamalara "Alınan kararlar"da görünür
+    if (not && secim !== "durdur") {
+      this.kararlariYaz(fid, [...this.kararlar(fid), {
+        zaman: simdi(), asama_id: asama?.id ?? null, asama_ad: asama?.ad ?? null, soran: "Kovan", baslik: "Projenin sahibinin notu",
+        soru: b.mesaj, cevap: not, karar_veren: "insan",
+      }]);
+    }
 
     switch (secim) {
       case "durdur":
@@ -446,6 +475,8 @@ export class Orkestrator {
         break;
       case "devam": case "kabul": case "atla":
         if (secim === "devam" && asama?.kilitle.length) this.kilitle(fid, asama);
+        // Tur sınırında "devam" ile geçilen aşamanın ADR'leri de kod/adr/ altına yazılır (biçimi geçerliyse)
+        if (secim === "devam" && asama?.dogrulama.some((v) => v.tip === "adr")) this.adrYaz(fid, asama);
         if (secim === "atla" && asama) this.sistemAdimi(fid, asama, "Atlandı", "atlandi", gelisimAtla ? "Gelişim önerileri şimdilik değerlendirilmedi." : "Aşama senin kararınla atlandı.");
         Object.assign(g, this.ilerlemeAlanlari(fid, idx + 1));
         break;
@@ -464,6 +495,15 @@ export class Orkestrator {
       case "butce_artir":
         g.butce_usd = Math.round(Math.max(f.butce_usd * 1.5, f.butce_usd + 1) * 100) / 100;
         break;
+      case "kabul_testine_don": {
+        if (!not) throw new KovanHatasi("Testte neyin yanlış olduğunu not olarak yaz; Test Otomasyon bu notla düzeltir.");
+        const test = asama ? this.kabulTestiAsamasi(f, asama) : null;
+        if (!test) throw new KovanHatasi("Bu aşamanın kilitli bir kabul testi aşaması yok.");
+        const hidx = asamalar.findIndex((a) => a.id === test.id);
+        Object.assign(g, { asama_idx: hidx, tur: 1, faz: "uret", ek_tur: 0, soru_turu: 0, onaylayanlar: [],
+          geri_bildirim: `### İnsanın notu (iş kaleminden geri gönderildi: kilitli testte hata)\n${not}` });
+        break;
+      }
       case "geri_gonder": {
         if (!not) throw new KovanHatasi("Geri gönderirken ne istediğini not olarak yaz.");
         let h = (hedef ?? "").trim() || asama?.geri_donus || null;
@@ -693,6 +733,12 @@ export class Orkestrator {
   /** Sunucu kapanıp açıldıysa yarıda kalan işleri insanın kararına bırakır. */
   private kurtar(): void {
     this.depo.calisanAdimlariKapat();
+    // Geçilmiş bir ADR aşamasının ADR kaydı eksikse tamamlanır (eski sürümde "devam" ile geçilen aşamalar)
+    for (const f of this.depo.fikirler()) {
+      if (this.adrOku(f.id).length) continue;
+      const gecilen = this.asamalar(f).slice(0, f.asama_idx).filter((a) => a.dogrulama.some((v) => v.tip === "adr"));
+      for (const a of gecilen) this.adrYaz(f.id, a);
+    }
     for (const f of this.depo.durumdakiler("calisiyor", "sirada")) {
       const asama = this.asamalar(f)[f.asama_idx] ?? null;
       this.bekleyeAl(f.id, asama, "kesildi", "Kovan yeniden başladı; bu iş yarıda kalmıştı. Kaldığı yerden devam edebilirsin.",
@@ -815,9 +861,12 @@ export class Orkestrator {
       if (tur >= sinir) {
         this.depo.fikirGuncelle(fid, { faz: "uret", geri_bildirim: gb });
         const devral = this.devralinabilir(this.depo.fikir(fid)!, asama);
-        const anahtarlar = ["bir_tur_daha", ...(devral ? ["claude_devral"] : []), "devam", "durdur"];
+        // Yazılımcı kilitli testin kendisinin hatalı olduğunu bildirdiyse, testi düzeltmenin tek meşru yolu kabul testine dönmektir
+        const testeDon = this.kabulTestiAsamasi(this.depo.fikir(fid)!, asama)
+          && this.depo.adimlar(fid).some((s) => s.asama_id === asama.id && s.ajan_ad === "Test şüphesi");
+        const anahtarlar = ["bir_tur_daha", ...(devral ? ["claude_devral"] : []), ...(testeDon ? ["kabul_testine_don"] : []), "devam", "durdur"];
         return this.bekleyeAl(fid, asama, "tur_siniri", `'${asama.ad}' ${tur} turda onay alamadı. Bulgular aşağıda; nasıl ilerleyelim?`,
-          secenekler(anahtarlar, devral ? "claude_devral" : "bir_tur_daha"), gb);
+          secenekler(anahtarlar, devral ? "claude_devral" : testeDon ? "kabul_testine_don" : "bir_tur_daha"), gb);
       }
       this.depo.fikirGuncelle(fid, { tur: tur + 1, faz: "uret", geri_bildirim: gb });
     }
@@ -1061,7 +1110,7 @@ export class Orkestrator {
     const kart = this.kartlar.get(v.inceleyen!)!;
     const f = this.depo.fikir(fid)!;
     const motor = this.motorSec(f, kart);
-    const model = motor.modelSec(kart);
+    const model = this.incelemeModeli(motor, kart);
     const dizinModu = asama.calisma_dizini === "kod";
     // Replatformda okuma araçları olan onaycı (MSA) belge aşamalarında da eski kodu açıp atıfları doğrulayabilir
     const kaynakOkur = !dizinModu && Boolean(f.kaynak) && kart.araclar.includes("Read");
@@ -1547,7 +1596,7 @@ export class Orkestrator {
   private async oyIste(fid: string, asama: Asama, kart: AjanKarti, sorular: AjanSorusu[]): Promise<HamOy[] | string> {
     const f = this.depo.fikir(fid)!;
     const motor = this.motorSec(f, kart);
-    const model = motor.modelSec(kart);
+    const model = this.incelemeModeli(motor, kart);
     const istem = this.oyIstemi(fid, asama, kart, sorular);
     const sistem = [kart.govde.trim(), ORTAK_KURALLAR, ORTAK_KARAR_KURALLARI].join("\n\n");
     let son: AjanSonucu | null = null;

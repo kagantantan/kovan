@@ -56,6 +56,7 @@ export interface Ayarlar {
   paralel_fikir: number;
   paralel_inceleme: boolean;
   onayi_koru: boolean;              // revizyon turunda önceki turda onaylayan onaycı yeniden bakmaz
+  claude_inceleme_modeli: string | null;   // Claude'daki incelemeler ve oylar bu modelle (ör. haiku); null: ajanın kendi modeli
   deneme_sayisi: number;
   deneme_gecikme_sn: number;
   calisma_dizini: string | null;
@@ -78,6 +79,7 @@ export const VARSAYILAN: Ayarlar = {
   paralel_fikir: 1,
   paralel_inceleme: true,
   onayi_koru: true,
+  claude_inceleme_modeli: null,
   deneme_sayisi: 2,
   deneme_gecikme_sn: 1,
   calisma_dizini: null,
@@ -128,6 +130,8 @@ function motorDogrula(ad: string, m: Record<string, unknown>, kaynak: string): M
       sicaklik: sayi("sicaklik") ?? null, en_fazla_token: sayi("en_fazla_token") ?? null,
       baglam_token: sayi("baglam_token") ?? 32_768, en_fazla_tur: sayi("en_fazla_tur") ?? 100,
       yerel: m.yerel !== false,
+      // Yerel sunucu (Ollama, LM Studio) çoğunlukla tek istek işler; kurum sunucusu (vLLM) paraleli kaldırır
+      es_zamanli: sayi("es_zamanli") ?? (/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])[:/]/.test(String(m.adres)) ? 1 : 4),
     };
   }
   throw new Error(`${kaynak}: motorlar.${ad}.tur 'ollama' ya da 'openai' olmalı`);

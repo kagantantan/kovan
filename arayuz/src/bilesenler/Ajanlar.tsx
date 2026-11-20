@@ -63,6 +63,33 @@ function motorCumlesi(a: AjanOzeti, durum: DurumYaniti | null): { tur: "claude" 
   return { tur: "claude", metin: `Claude'da çalışır, model ${a.model}.` };
 }
 
+/** Tasarruf: Claude'daki incelemeler ve oylar daha ucuz modelle; belgeyi ve kodu yazan çağrılar ajanın kendi modelinde kalır. */
+function IncelemeModeli({ durum }: { durum: DurumYaniti | null }) {
+  const [model, setModel] = useState(durum?.claude_inceleme_modeli ?? "");
+  const [mesaj, setMesaj] = useState<string | null>(null);
+  useEffect(() => { setModel(durum?.claude_inceleme_modeli ?? ""); }, [durum?.claude_inceleme_modeli]);
+  if (!durum?.motorlar.claude) return null;
+  return (
+    <div className="inceleme-modeli">
+      <label className="alan">
+        <span className="alan-ad">İncelemeler ve oylar (Claude)</span>
+        <select value={model} aria-label="İncelemelerde ve oylarda Claude modeli" onChange={async (e) => {
+          const m = e.target.value;
+          setModel(m); setMesaj(null);
+          try { await api.incelemeModeli(m); setMesaj("Kaydedildi; sonraki incelemeden itibaren geçerli."); } catch (h) { setMesaj((h as Error).message); }
+        }}>
+          <option value="">Her ajan kendi modelinde</option>
+          <option value="haiku">haiku (en ucuz)</option>
+          <option value="sonnet">sonnet</option>
+          <option value="opus">opus</option>
+        </select>
+      </label>
+      <p className="alan-not">Onay kurulu incelemeleri ve ekip oyları bu modelle çalışır; belgeleri, planları ve kodu yazan ajanlar kendi modelinde kalır. Claude kullanımının yaklaşık yarısı incelemelerden gelir.</p>
+      {mesaj && <p className="alan-not" role="status">{mesaj}</p>}
+    </div>
+  );
+}
+
 export function Ajanlar({ ajanlar, seciliId, durum, onDegisti }: { ajanlar: AjanOzeti[]; seciliId: string | null; durum: DurumYaniti | null; onDegisti: () => void }) {
   const secili = ajanlar.find((a) => a.id === seciliId) ?? ajanlar[0];
   return (
@@ -70,6 +97,7 @@ export function Ajanlar({ ajanlar, seciliId, durum, onDegisti }: { ajanlar: Ajan
       <nav className="iki-bolme-liste" aria-label="Ajanlar">
         <h1 className="sayfa-baslik">Ajanlar</h1>
         <p className="sayfa-giris">Her ajanın tek bir rolü ve yazılı sınırları var. Kartlar <code>ajanlar/</code> klasöründe; değiştirince Kovan'ı yeniden başlat.</p>
+        <IncelemeModeli durum={durum} />
         <ul className="ajan-listesi">
           {ajanlar.map((a) => (
             <li key={a.id}>

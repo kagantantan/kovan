@@ -33,7 +33,11 @@ asamalar:
         odak: Giriş noktaları, adım sırası, veri modeli ve hata davranışı koda göre doğru mu? Atlanan bir yol var mı?
       - ad: Hesaplama ve uç durumlar
         inceleyen: test-analisti
-        odak: Formüller, yuvarlama, gün sayımı ve uç durumlar test yazılabilecek kesinlikte mi?
+        odak: >
+          Formüller, yuvarlama, gün sayımı ve uç durumlar test yazılabilecek kesinlikte mi (formül, girdi ve yuvarlama adımı açık mı)?
+          Bu aşamada sayısal örnekler açıklayıcıdır: analist kod çalıştıramaz, kesin beklenen değerleri Test Otomasyon araçla ya da
+          altın test eski sistemin çıktısıyla üretir. Elle hesaplanmış örnek için yalnızca "açıklayıcı örnek" diye işaretlenmesini iste,
+          araçla doğrulanmasını isteme. Karşılaştırma ölçütü gibi konularda "Alınan kararlar" bölümü fikir metninden önce gelir.
     en_fazla_tur: 3
 
   - id: brif

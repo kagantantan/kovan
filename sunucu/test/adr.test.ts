@@ -129,4 +129,29 @@ describe("ADR aşaması", () => {
     // Kilitli ADR'ye yazma geri alındı
     expect(dosya(k, fid, "kod/adr/README.md")).toContain("# Mimari karar kayıtları");
   });
+
+  it("tur sınırında 'devam' ile geçilen aşamanın ADR'leri de yazılır; eksik kalmışsa açılışta tamamlanır", async () => {
+    const AKIS_DUZELT = AKIS.replace("        adr: { en_az: 1, zorunlu: [calisma_bicimi] }", "        adr: { en_az: 1, zorunlu: [calisma_bicimi] }\n      - ad: Analist onayı\n        inceleyen: analist").replace("    girdiler: [fikir]\n    cikti: teknik-plan", "    girdiler: [fikir]\n    cikti: teknik-plan\n    en_fazla_tur: 1");
+    const betik = (c: AjanCagrisi): Partial<AjanSonucu> | null => {
+      if (c.gorev_turu === "inceleme") return { yapisal: { karar: "DUZELT", gerekce: "-", bulgular: ["eksik"], sorular: [] }, metin: "" };
+      if (c.gorev_turu !== "uret") return null;
+      return { metin: c.rol === "mimar" ? belge(ADR("ADR-1", "calisma_bicimi")) : "Kod yazıldı." };
+    };
+    const motorlar = () => new Map<string, Motor>([["deneme", new BetikMotor("deneme", betik)], ["claude", new SahteMotor("claude")], ["qwen-yerel", new SahteMotor("qwen-yerel", true)]]);
+    const kok = geciciKok({ "adr-denemesi": AKIS_DUZELT });
+    const k = await kovanOlustur({ kok, motorlar: motorlar() });
+    const fid = await k.ork.yeniFikir("", ORNEK_MINI, "adr-denemesi", "deneme");
+    await bekle(k, fid, bekliyor("tur_siniri"));
+    k.ork.kararVer(fid, "devam");
+    await bekle(k, fid, bekliyor("insan"));
+    expect(k.ork.fikirDetayi(fid).adrler.map((a) => a.id)).toEqual(["ADR-1"]);
+    expect(dosya(k, fid, "kod/adr/ADR-001-gun-sonu-batch-job-olarak-calisir.md")).toContain("(seçildi)");
+
+    // Eski sürümde yazılmamış gibi: kayıt ve dosyalar silinir, Kovan yeniden açılınca tamamlanır
+    fs.rmSync(path.join(k.calisma, fid, "kod", "adr"), { recursive: true, force: true });
+    fs.rmSync(path.join(k.calisma, fid, ".kovan", "adr.json"));
+    const k2 = await kovanOlustur({ kok, motorlar: motorlar() });
+    expect(k2.ork.fikirDetayi(fid).adrler.map((a) => a.id)).toEqual(["ADR-1"]);
+    expect(dosya(k2, fid, "kod/adr/README.md")).toContain("ADR-1");
+  });
 });

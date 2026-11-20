@@ -29,6 +29,7 @@ export interface UyumluMotorAyari {
   baglam_token?: number;
   en_fazla_tur?: number;
   yerel?: boolean;                    // true (varsayılan): veri kurumun dışına çıkmaz, Hepsi yerel'de kullanılabilir
+  es_zamanli?: number;                // aynı anda kaç ajan çağrısı; fazlası sırada bekler (süresi sırası gelince başlar)
 }
 
 const AJAN_BETIGI = fileURLToPath(new URL("./ajan/kovan-ajan.ts", import.meta.url));
@@ -43,6 +44,10 @@ export class UyumluMotor implements Motor {
   surum = "OpenAI uyumlu";
   modeller: string[] = [];
   private sonKontrol = 0;
+  private saglikSuruyor: Promise<boolean> | null = null;
+  /** Aynı anda en fazla es_zamanli çağrı: Ollama gibi tek yuvalı sunucuda sıradaki ajanın süresi beklerken dolmasın. */
+  private calisan = 0;
+  private sira: (() => void)[] = [];
 
   /** Ayarlar ekranından girilen anahtar; kalıcı istendiyse kasaya da yazılmıştır. */
   private ekrandaki: string | null = null;
@@ -123,27 +128,48 @@ export class UyumluMotor implements Motor {
   }
 
   async saglik(zorla = false): Promise<boolean> {
+    // Aynı anda gelen çağrılar (paralel onaycılar) süren denetimi bekler; yarım kalmış "hazır değil" görmesinler
+    if (this.saglikSuruyor) return this.saglikSuruyor;
     if (!zorla && Date.now() - this.sonKontrol < 10_000) return this.hazir;
-    this.sonKontrol = Date.now();
-    this.hazir = false;
-    this.hata = null;
+    this.saglikSuruyor = this.saglikDenetle().then(([hazir, hata]) => {
+      this.hazir = hazir;
+      this.hata = hata;
+      this.sonKontrol = Date.now();
+      return hazir;
+    }).finally(() => { this.saglikSuruyor = null; });
+    return this.saglikSuruyor;
+  }
+
+  private async saglikDenetle(): Promise<[boolean, string | null]> {
     const a = this.anahtar();
-    if (a.hata) { this.hata = a.hata; return false; }
+    if (a.hata) return [false, a.hata];
     let b: BaglantiAyari;
-    try { b = this.baglanti(a.deger); } catch (e) { this.hata = `ca_dosyasi okunamadı: ${(e as Error).message}`; return false; }
+    try { b = this.baglanti(a.deger); } catch (e) { return [false, `ca_dosyasi okunamadı: ${(e as Error).message}`]; }
     try {
-      const v = await jsonIstek(b, "/models", undefined, { sure_ms: 5000 });
+      // Yerel sunucu üretim yaparken (ya da bellek baskısında) yavaş yanıtlayabilir
+      const v = await jsonIstek(b, "/models", undefined, { sure_ms: 15_000 });
       this.modeller = (Array.isArray(v?.data) ? v.data : []).map((m: { id?: string }) => String(m?.id ?? "")).filter(Boolean);
       if (this.modeller.length && !this.modeller.includes(this.ayar.model)) {
-        this.hata = `Model sunucuda yok: ${this.ayar.model}. Sunucudaki modeller: ${this.modeller.slice(0, 8).join(", ")}`;
-        return false;
+        return [false, `Model sunucuda yok: ${this.ayar.model}. Sunucudaki modeller: ${this.modeller.slice(0, 8).join(", ")}`];
       }
     } catch (e) {
       // /models'i sunmayan ağ geçitleri var: erişim sorunu değilse hazır say
-      if (!(e instanceof HttpHatasi && [404, 405].includes(e.durum))) { this.hata = baglantiHatasi(e, b.adres).mesaj; return false; }
+      if (!(e instanceof HttpHatasi && [404, 405].includes(e.durum))) return [false, baglantiHatasi(e, b.adres).mesaj];
     }
-    this.hazir = true;
-    return true;
+    return [true, null];
+  }
+
+  private async yuvaAl(): Promise<() => void> {
+    const sinir = Math.max(1, this.ayar.es_zamanli ?? 1);
+    if (this.calisan >= sinir) await new Promise<void>((coz) => this.sira.push(coz));
+    this.calisan++;
+    let birakildi = false;
+    return () => {
+      if (birakildi) return;
+      birakildi = true;
+      this.calisan--;
+      this.sira.shift()?.();
+    };
   }
 
   modelSec(kart: AjanKarti): string {
@@ -160,6 +186,11 @@ export class UyumluMotor implements Motor {
 
   async calistir(c: AjanCagrisi): Promise<AjanSonucu> {
     if (!(await this.saglik())) return sonuc({ hata: this.hata ?? `${this.ad} hazır değil`, kalici_hata: true });
+    const birak = await this.yuvaAl();
+    try { return await this.calistirYuvada(c); } finally { birak(); }
+  }
+
+  private async calistirYuvada(c: AjanCagrisi): Promise<AjanSonucu> {
     const a = this.anahtar();
     const { anahtar: _gizli, ...baglanti } = this.baglanti(null, c.model);
     const girdi = JSON.stringify({
