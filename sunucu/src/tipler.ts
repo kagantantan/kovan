@@ -3,9 +3,85 @@
 export type Mod = "hibrit" | "claude" | "deneme" | "yerel";
 export type FikirDurumu = "sirada" | "calisiyor" | "bekliyor" | "tamamlandi" | "durduruldu";
 export type BeklemeSebebi = "insan" | "tur_siniri" | "hata" | "butce" | "kesildi" | "ajan_sorusu";
-/** Sorunun nereden geldiği: üreten ajan, onaycı ya da Ürün Sahibi'nin gelişim önerileri. */
-export type BeklemeKaynagi = "uret" | "inceleme" | "gelisim";
-export type AsamaTuru = "ajan" | "insan" | "kalemler" | "gelisim";
+/** Sorunun nereden geldiği: üreten ajan, onaycı, Ürün Sahibi'nin gelişim önerileri, keşfin iş önerisi (öneri kartı) ya da aşama sonu kapısı. */
+export type BeklemeKaynagi = "uret" | "inceleme" | "gelisim" | "kesif" | "kapi";
+/** Aşama sonu onay kapısı hangi aşamalarda açılır: yalnızca sonda (Kabul), planlama aşamalarında (akışta kapi: true) ya da her aşamada. */
+export type Katilim = "sonda" | "planlama" | "her_asama";
+export const KATILIMLAR: readonly Katilim[] = ["sonda", "planlama", "her_asama"];
+
+/** Aşamanın belgesinin sonundaki karar özeti (kovan-ozet): kapıda madde madde onaylanır, Büyük Birader önceki aşamaları bunlardan izler. */
+export interface OzetMaddesi {
+  baslik: string;
+  karar: string;
+  neden: string;
+  alternatif: string;
+  tur: "karar" | "varsayim" | "kapsam";
+}
+
+/** Büyük Birader: her aşamanın sonunda bütün işe bakıp hüküm verir. VETO aşamayı yazarına geri gönderir. */
+export type BiraderHukmu = "UYGUN" | "DIKKAT" | "VETO";
+export interface BiraderBulgusu {
+  konu: string;
+  kanit: string;      // hangi belge ya da aşama, oradaki ifade; kanıtsız veto geçersizdir
+  aciklama: string;
+}
+export interface BiraderDegerlendirmesi {
+  asama_id: string;
+  asama_ad: string;
+  tur: number;
+  hukum: BiraderHukmu;
+  ozet: string;
+  bulgular: BiraderBulgusu[];
+  oneri: string;
+  zaman: string;
+  dusuruldu?: boolean;   // kanıtsız veto sistemce DİKKAT'e düşürüldü
+}
+
+/** Kapıda verdiğin onay: hangi aşama, hangi belge (özet), hangi maddeler. Karar defterine girmez; arayüzde görünür. */
+export interface OnayKaydi {
+  asama_id: string;
+  asama_ad: string;
+  zaman: string;
+  belge_ozeti: string;   // onaylanan belgenin SHA-256'sı: belge değişmediyse kapı yeniden açılmaz
+  maddeler: { baslik: string; karar: string }[];
+}
+
+/** Ajanla (ya da Büyük Birader'le) konuşma: soru, cevap ve istersen karara bağlanan sonuç. */
+export interface SohbetMesaji {
+  id: number;
+  asama_id: string | null;   // Büyük Birader'e sorulduysa o an bakılan aşama (bağlam için), yoksa null
+  hedef: string;             // kart id
+  hedef_ad: string;
+  soru: string;
+  cevap: string | null;
+  durum: "bekliyor" | "tamam" | "hata" | "durduruldu";
+  zaman: string;
+  karar: string | null;      // "Karara bağla" ile deftere yazılan cümle
+}
+/** kesif: mevcut projede iş önerisi çıkarır, sana sorar. kontrol: ajan yok, yalnızca komut koşar (baz çizgisi). */
+export type AsamaTuru = "ajan" | "insan" | "kalemler" | "gelisim" | "kesif" | "kontrol";
+
+/** Mevcut proje üzerinde iş: keşfin önerdiği, senin onayladığın öneri kartı (.kovan/is.json). */
+export type IsTuru = "hata" | "ozellik" | "entegrasyon";
+export type IsBoyutu = "kucuk" | "orta" | "buyuk";
+export interface IsTarafi {
+  yazma_alani: string[];   // kod/ köküne göre, proje/ altında: ajanların yazabileceği klasör ve dosyalar
+  test_alani: string;      // yeni testlerin yazılacağı ve kilitleneceği klasör
+}
+export interface IsOnerisi {
+  tur: IsTuru;
+  boyut: IsBoyutu;
+  gerekce: string;
+  taraflar: Record<string, IsTarafi>;   // be, fe
+}
+export interface IsKaydi extends IsOnerisi {
+  test_komutu: string;     // proje kökünde koşar; sen onayladın
+}
+/** Aşamanın hangi işlerde koştuğu (boş alan: her zaman). */
+export interface Kosul {
+  boyut?: IsBoyutu[];
+  taraf?: string[];
+}
 
 /** Sistem kararlarında bir seçenek (arayüzde kart olarak görünür). */
 export interface Secenek {
@@ -48,6 +124,8 @@ export interface AjanSorusu {
   oylar?: Oy[];         // ekip oyladıysa: kim neyi seçti
   neden?: string;       // neden sana geldi
   oneri_id?: string;    // gelişim önerisi (kaynak: gelisim)
+  /** Aşama sonu kapısındaki madde (kaynak: kapi): karar özeti maddesi, mimari karar (seçenekleriyle) ya da belgenin geneli. */
+  kapi?: { tur: "ozet" | "adr" | "genel"; madde_turu?: "karar" | "varsayim" | "kapsam"; oneri?: string };
 }
 
 export interface Bekleme {
@@ -65,6 +143,7 @@ export interface Bekleme {
   zaman: string;
   geri_hedefler?: { id: string; ad: string }[];
   varsayilan_hedef?: string | null;
+  birader?: BiraderDegerlendirmesi | null;   // kapıda: Büyük Birader'in bu aşama için değerlendirmesi
 }
 
 export interface KaynakBilgisi {
@@ -74,6 +153,22 @@ export interface KaynakBilgisi {
   boyut: number;
   donusturulen: number;  // HTML'e çevrilen Word belgeleri
   atlanan: number;
+}
+
+export interface ProjeBilgisi {
+  yol: string;             // senin makinendeki asıl klasör; Kovan ona dokunmaz
+  dosya_sayisi: number;
+  satir: number;
+  boyut: number;
+  utf8_olmayan: number;
+  atlanan: number;
+  test_komutu: string | null;   // saptanan öneri
+}
+
+/** İş bitince çıkan yama: cikti/degisiklik.patch ve yamaya girmeyen dosyalar. */
+export interface YamaOzeti {
+  dosya: string;           // fikir klasörüne göre
+  dosyalar: { yol: string; durum: "eklendi" | "silindi" | "degisti"; ayri: boolean }[];
 }
 
 export interface Fikir {
@@ -100,7 +195,10 @@ export interface Fikir {
   temel_fikir?: string | null;    // önceki sürümün fikir id'si
   sonraki_surum?: string | null;  // bu fikirden başlatılan yeni sürüm
   kapsam_disi?: string[];         // "bu fikirde alanıma giren konu yok" diyen onaycılar (ör. mevzuat)
-  kaynak?: KaynakBilgisi | null;   // replatform: mevcut sistemin kodu ve dokümanları (kod/kaynak/)
+  kaynak?: KaynakBilgisi | null;   // replatform: mevcut sistemin kodu ve dokümanları (kod/kaynak/); mevcut projede: ekler
+  proje?: ProjeBilgisi | null;     // mevcut proje üzerinde iş: projenin çalışma kopyası (kod/proje/)
+  katilim?: Katilim;               // aşama sonu kapısı: eski kayıtlarda yok (sonda)
+  birader_veto?: number;           // bu aşama döngüsünde Büyük Birader'in veto sayısı
   hedef_yigin?: string | null;     // yeni kodun teknolojisi (karar defterine de yazılır)
   olusturma: string;
   guncelleme: string;
@@ -108,7 +206,7 @@ export interface Fikir {
   bitis: string | null;
 }
 
-export type AdimTipi = "uret" | "inceleme" | "kontrol" | "sistem" | "oy";
+export type AdimTipi = "uret" | "inceleme" | "kontrol" | "sistem" | "oy" | "sohbet";
 
 export interface Adim {
   id: number;
@@ -227,6 +325,7 @@ export interface FikirOzeti {
   asama_no: number;
   asama_sayisi: number;
   bekleme_sebebi: BeklemeSebebi | null;
+  birader: BiraderHukmu | null;   // Büyük Birader'in son hükmü (listede işaret için)
 }
 
 export interface OnayRozeti {
@@ -269,8 +368,15 @@ export interface FikirDetayi {
   plan: PlanKalemiGorunumu[] | null;
   gelisim: GelisimKaydi[];
   adrler: Adr[];
+  birader_acik: boolean;                // bu fikirde Büyük Birader çalışıyor mu
+  birader: BiraderDegerlendirmesi[];    // Büyük Birader'in aşama aşama değerlendirmeleri (eskiden yeniye)
+  onaylar: OnayKaydi[];                 // kapıda verdiğin onaylar
+  sohbet: SohbetMesaji[];               // ajanlarla ve Büyük Birader'le konuşmalar
+  sohbet_hedefleri: { id: string; ad: string; kisa: string; asama_id: string | null; asama_ad: string | null }[];   // şu an kime sorabilirsin
+  is: IsKaydi | null;                   // mevcut projede: onaylanmış öneri kartı
+  yama: YamaOzeti | null;               // mevcut projede: üretilmiş yama
   sonraki_surum_metni: string | null;   // kabul edilen gelişim önerileri varsa yeni sürümün tohum metni
-  dosyalar: { belgeler: DosyaBilgisi[]; incelemeler: DosyaBilgisi[]; kod: DosyaBilgisi[]; kaynak: DosyaBilgisi[] };
+  dosyalar: { belgeler: DosyaBilgisi[]; incelemeler: DosyaBilgisi[]; kod: DosyaBilgisi[]; kaynak: DosyaBilgisi[]; proje: DosyaBilgisi[]; cikti: DosyaBilgisi[] };
   onizlemeler: { ad: string; yol: string }[];
   aktif_sure_sn: number;
   ajan_cagrisi: number;
@@ -327,6 +433,9 @@ export interface DurumYaniti {
   ortak_karar: { acik: boolean; kurul: { id: string; ad: string; kisa: string }[]; kural: "oybirligi" | "cogunluk" };
   hedef_yiginlar: HedefYigin[];
   ornek_kaynak: string | null;  // Kovan'la gelen kurgusal eski sistem (ornekler/reeskont-eski), replatform örneği için
+  ornek_proje: string | null;   // Kovan'la gelen kurgusal küçük proje (ornekler/proje-ornek), mevcut proje örneği için
+  katilim: Katilim;             // yeni fikirde varsayılan katılım (aşama sonu kapıları)
+  buyuk_birader: boolean;       // Büyük Birader açık mı
   yerel_motor: string | null;
   modlar: Mod[];                // bu kurulumda açık modlar
   dis_ayar: string | null;      // okunan dış ayar dosyası   // "Hepsi yerel" modunda bütün ajanların kullandığı motor
@@ -371,7 +480,9 @@ export interface AkisAsamaOzeti {
   en_fazla_tur: number;
   is_kurali_sana: boolean;
   once_soru: boolean;
-  dogrulama: { ad: string; tip: "komut" | "ajan" | "plan" | "atif" | "adr"; komut: string | null; inceleyen: string | null; inceleyen_ad: string | null; atlanabilir: boolean; taraf: string | null; adr_zorunlu: string[] }[];
+  kosul: Kosul | null;                // mevcut projede: yalnızca bu boyut ve taraflarda koşar
+  kapi: boolean;                      // "planlama" katılımında bu aşamanın sonunda onay kapısı açılır
+  dogrulama: { ad: string; tip: "komut" | "ajan" | "plan" | "atif" | "adr"; komut: string | null; inceleyen: string | null; inceleyen_ad: string | null; atlanabilir: boolean; taraf: string | null; adr_zorunlu: string[]; beklenen: "yesil" | "kirmizi" }[];
   kalem_adimlari: AkisAsamaOzeti[];   // tur: kalemler ise her kalem için tekrarlanan adımlar
 }
 
@@ -381,6 +492,7 @@ export interface AkisOzeti {
   aciklama: string;
   fikir_butcesi_usd: number;
   ortak_karar: boolean;
-  kaynak: "zorunlu" | "yok";   // zorunlu: fikir mevcut sistemin kaynaklarıyla başlar (replatform)
+  kaynak: "zorunlu" | "yok" | "proje";   // zorunlu: mevcut sistemin kaynaklarıyla başlar (replatform); proje: mevcut proje üzerinde iş
+  buyuk_birader: boolean;                // bu akışta Büyük Birader çalışır mı (ayarda da açık olmalı)
   asamalar: AkisAsamaOzeti[];
 }

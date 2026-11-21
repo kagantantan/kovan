@@ -33,6 +33,8 @@ function grupla(adimlar: Adim[], adlar: Map<string, string>): Grup[] {
 
 function simgesi(a: Adim): SimgeAdi {
   if (a.tip === "uret") return "kalem";
+  if (a.tip === "sohbet") return "sohbet";
+  if (a.ajan === "buyuk-birader") return "goz";
   if (a.tip === "inceleme") return "buyutec";
   if (a.tip === "kontrol") return "tup";
   if (a.tip === "oy") return "oy";

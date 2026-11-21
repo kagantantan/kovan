@@ -14,12 +14,12 @@ export const EN_FAZLA_BOYUT = 200 * 1024 * 1024;        // toplam
 export const EN_FAZLA_DOSYA_BOYUTU = 20 * 1024 * 1024;  // tek dosya
 
 /** Kopyalanmayan klasörler: sürüm kontrolü, bağımlılıklar, derleme çıktıları, editör ayarları. */
-const ATLA_KLASOR = new Set([".git", ".svn", ".hg", "node_modules", "target", "build", "dist", "out", ".gradle", ".idea", ".vscode",
+export const ATLA_KLASOR = new Set([".git", ".svn", ".hg", "node_modules", "target", "build", "dist", "out", ".gradle", ".idea", ".vscode",
   "__pycache__", ".venv", "venv", ".mvn"]);
 const IKILI = new Set([".class", ".jar", ".war", ".ear", ".exe", ".dll", ".so", ".dylib", ".o", ".a", ".lib", ".obj", ".pyc", ".zip",
   ".tar", ".gz", ".tgz", ".7z", ".rar", ".dmp", ".bak", ".mdb", ".sqlite", ".db"]);
 
-const TURLER: Record<string, string> = {
+export const TURLER: Record<string, string> = {
   ".sql": "SQL", ".pks": "PL/SQL", ".pkb": "PL/SQL", ".pkg": "PL/SQL", ".prc": "PL/SQL", ".fnc": "PL/SQL", ".trg": "PL/SQL",
   ".pls": "PL/SQL", ".plb": "PL/SQL", ".plsql": "PL/SQL", ".typ": "PL/SQL", ".tps": "PL/SQL", ".tpb": "PL/SQL",
   ".java": "Java", ".kt": "Kotlin", ".scala": "Scala", ".cs": "C#", ".vb": "VB.NET", ".c": "C", ".h": "C/C++ başlık", ".cpp": "C++",
@@ -50,12 +50,12 @@ export interface KaynakOzeti {
   atlanan: { yol: string; neden: string }[];
 }
 
-function genislet(ham: string): string {
+export function genislet(ham: string): string {
   const y = ham.trim().replace(/^["']|["']$/g, "");
   return path.resolve(y === "~" || y.startsWith("~/") ? path.join(os.homedir(), y.slice(1)) : y);
 }
 
-function ikiliMi(dosya: string): boolean {
+export function ikiliMi(dosya: string): boolean {
   const fd = fs.openSync(dosya, "r");
   try {
     const tampon = Buffer.alloc(8192);
@@ -88,7 +88,7 @@ function utf8eCevir(dosya: string): string | null {
   return kodlama;
 }
 
-function satirSay(dosya: string): number {
+export function satirSay(dosya: string): number {
   const veri = fs.readFileSync(dosya);
   let n = 0;
   for (const b of veri) if (b === 10) n++;
@@ -205,9 +205,9 @@ const binlik = (n: number) => n.toLocaleString("tr-TR");
 const kb = (b: number) => (b < 1024 * 1024 ? `${(b / 1024).toFixed(1).replace(".", ",")} KB` : `${(b / 1048576).toFixed(1).replace(".", ",")} MB`);
 
 /** Ajanların ilk okuyacağı döküm: türlere göre özet, dosya listesi, çevrilenler, atlananlar. */
-export function envanterBelgesi(o: KaynakOzeti): string {
+export function envanterBelgesi(o: KaynakOzeti, giris?: string): string {
   const p = ["# Kaynak envanteri", "",
-    `Mevcut sistemin kodu ve dokümanları \`${KAYNAK_KLASORU}/\` klasöründe (salt okunur, kilitli). ` +
+    (giris ?? `Mevcut sistemin kodu ve dokümanları \`${KAYNAK_KLASORU}/\` klasöründe (salt okunur, kilitli).`) + " " +
     `Toplam ${binlik(o.dosya_sayisi)} dosya, ${binlik(o.satir)} satır, ${kb(o.boyut)}.`, "",
     "## Türlere göre", "| Tür | Dosya | Satır |", "|---|---|---|"];
   const turler = new Map<string, { dosya: number; satir: number }>();
@@ -239,12 +239,12 @@ export function envanterBelgesi(o: KaynakOzeti): string {
   return p.join("\n") + "\n";
 }
 
-/** Kaynak atıfları: "kaynak/<yol>:<satır>" ya da "kaynak/<yol>:<ilk>-<son>". */
-export function atiflariDenetle(belge: string, kodKoku: string): { gecerli: number; hatalar: string[] } {
+/** Kaynak atıfları: "kaynak/<yol>:<satır>" ya da "kaynak/<yol>:<ilk>-<son>". onekler: atıf verilebilen üst klasörler (mevcut projede proje/ de). */
+export function atiflariDenetle(belge: string, kodKoku: string, onekler: string[] = [KAYNAK_KLASORU]): { gecerli: number; hatalar: string[] } {
   const hatalar: string[] = [];
   const satirSayilari = new Map<string, number | null>();
   let gecerli = 0;
-  const desen = new RegExp(`(?<![\\w/])(${KAYNAK_KLASORU}/[^\\s\`'"()\\[\\]<>|,;]+?):(\\d+)(?:-(\\d+))?(?!\\d)`, "g");
+  const desen = new RegExp(`(?<![\\w/])((?:${onekler.join("|")})/[^\\s\`'"()\\[\\]<>|,;]+?):(\\d+)(?:-(\\d+))?(?!\\d)`, "g");
   const gorulen = new Set<string>();
   for (const m of belge.matchAll(desen)) {
     const [atif, rel, a, b] = m;
@@ -253,7 +253,7 @@ export function atiflariDenetle(belge: string, kodKoku: string): { gecerli: numb
     const ilk = Number(a);
     const son = b ? Number(b) : ilk;
     const tam = path.resolve(kodKoku, rel);
-    if (!tam.startsWith(path.resolve(kodKoku, KAYNAK_KLASORU) + path.sep) || !fs.existsSync(tam) || !fs.statSync(tam).isFile()) {
+    if (!onekler.some((o) => tam.startsWith(path.resolve(kodKoku, o) + path.sep)) || !fs.existsSync(tam) || !fs.statSync(tam).isFile()) {
       hatalar.push(`${atif}: böyle bir dosya yok`);
       continue;
     }
@@ -263,6 +263,6 @@ export function atiflariDenetle(belge: string, kodKoku: string): { gecerli: numb
     if (ilk < 1 || son < ilk || son > n) { hatalar.push(`${atif}: dosya ${n} satır; bu satırlar yok`); continue; }
     gecerli++;
   }
-  if (!gecerli && !hatalar.length) hatalar.push(`Belgede hiç kod atfı yok. Her kuralı \`${KAYNAK_KLASORU}/<dosya>:<satır>\` biçiminde koda bağla.`);
+  if (!gecerli && !hatalar.length) hatalar.push(`Belgede hiç kod atfı yok. Her kuralı \`${onekler[0]}/<dosya>:<satır>\` biçiminde koda bağla.`);
   return { gecerli, hatalar };
 }

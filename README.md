@@ -6,6 +6,10 @@ Ajanlar takıldıklarında **önce kendi aralarında oy veriyor**; oybirliği ç
 
 Sıfırdan bir ürün yerine **var olan bir sistemi de yeniden yazdırabilirsin (replatform)**: eski kodu ve analiz dokümanını verirsin; ekip önce sistemin bugün gerçekte ne yaptığını koda atıflarla çıkarır, doküman ile kod arasındaki farkları karara bağlar (anlaşamazsa sana sorar), sonra temiz bir mimariyle ve eski sistemin çıktısıyla karşılaştırarak yeniden yazar. Çıktı, kendi sistemine entegre edeceğin kod ve bir entegrasyon kılavuzudur.
 
+Her şeyin tepesinde **Büyük Birader** izler: her aşamanın sonunda işin tamamına bakar, kapsamdan sapmayı ve kararlarla çelişkiyi yakalarsa aşamayı veto eder. Sonra **senin kapın** gelir: o aşamada alınan kararlar madde madde önüne düşer; onaylar ya da değiştirirsin, mimari seçenekler arasından sen seçersin, emin olamadığın yerde ajana soru sorarsın.
+
+Ürün teslim edildikten sonra da iş bitmez: **var olan bir projede hata düzeltme, yeni özellik ya da entegrasyon** için projenin klasörünü verir, isteğini yazarsın. Kovan projeyi okur, işin türünü ve boyutunu önerir; sen onaylarsın. Küçük işte önce hatayı yakalayan test yazılır, sonra düzeltme; büyük işte planlama derinleşir. Projene dokunulmaz, sonuç bir yama dosyasıdır.
+
 **Hibrit çalışır:** kodu yerelde **Qwen** (Ollama) yazar; analiz, tasarım ve onayları **Claude** yapar. Kod makineden çıkmamalıysa **Hepsi yerel** modu bütün ajanları yerel modelde çalıştırır. Kurumun kendi LLM'i varsa (OpenAI uyumlu bir API ve bir anahtar) bütün ajanlar ona bağlanır; adres, anahtarın yeri ve ajan ayarları repo dışındaki bir ayar dosyasından gelir, Claude Code da gerekmez.
 **Qwen yazar, Claude onaylar, testler karar verir, sen yön verirsin.**
 
@@ -17,18 +21,20 @@ Sıfırdan bir ürün yerine **var olan bir sistemi de yeniden yazdırabilirsin 
 1. [Amaç](#amaç)
 2. [Mimari](#mimari)
 3. [Kararlar: önce ekip, gerekirse sen](#kararlar-önce-ekip-gerekirse-sen)
-4. [Derin planlama ve iş kalemleri](#derin-planlama-ve-iş-kalemleri)
-5. [Gelişim önerileri ve yeni sürüm](#gelişim-önerileri-ve-yeni-sürüm)
-6. [Replatform: mevcut sistemi yeniden yazmak](#replatform-mevcut-sistemi-yeniden-yazmak)
-7. [Hızlı başlangıç](#hızlı-başlangıç)
-8. [Hibrit için yerel Qwen kurulumu](#hibrit-için-yerel-qwen-kurulumu)
-9. [Kurum içi LLM ile çalıştırmak](#kurum-içi-llm-ile-çalıştırmak)
-10. [Ekip ve onay kurulları](#ekip-ve-onay-kurulları)
-11. [Üretilen uygulamanın yığını](#üretilen-uygulamanın-yığını)
-12. [Büyütmek](#büyütmek)
-13. [Kovan'ı geliştirmek](#kovanı-geliştirmek)
-14. [Sorun giderme](#sorun-giderme)
-15. [Yol haritası](#yol-haritası)
+4. [Büyük Birader ve onay kapıları](#büyük-birader-ve-onay-kapıları)
+5. [Derin planlama ve iş kalemleri](#derin-planlama-ve-iş-kalemleri)
+6. [Gelişim önerileri ve yeni sürüm](#gelişim-önerileri-ve-yeni-sürüm)
+7. [Replatform: mevcut sistemi yeniden yazmak](#replatform-mevcut-sistemi-yeniden-yazmak)
+8. [Mevcut proje üzerinde iş: hata, özellik, entegrasyon](#mevcut-proje-üzerinde-iş-hata-özellik-entegrasyon)
+9. [Hızlı başlangıç](#hızlı-başlangıç)
+10. [Hibrit için yerel Qwen kurulumu](#hibrit-için-yerel-qwen-kurulumu)
+11. [Kurum içi LLM ile çalıştırmak](#kurum-içi-llm-ile-çalıştırmak)
+12. [Ekip ve onay kurulları](#ekip-ve-onay-kurulları)
+13. [Üretilen uygulamanın yığını](#üretilen-uygulamanın-yığını)
+14. [Büyütmek](#büyütmek)
+15. [Kovan'ı geliştirmek](#kovanı-geliştirmek)
+16. [Sorun giderme](#sorun-giderme)
+17. [Yol haritası](#yol-haritası)
 
 ---
 
@@ -54,6 +60,7 @@ Bir yazılım ekibinin rollerini, **sınırları sistemce uygulanan** dar rollü
 ### Hedefler
 - Kişisel proje fikirlerini uçtan uca, çalışan ve testli koda dönüştürmek.
 - Var olan bir sistemi anlayıp temiz, testli ve korunan kurallarda eskisiyle eşdeğer biçimde yeniden yazmak (replatform).
+- Teslimden sonraki hayatı da taşımak: var olan bir projede hata, yeni özellik ve entegrasyon işlerini, işin boyutuna uygun bir yoldan, projeye dokunmadan yapmak.
 - Her adımı görünür kılmak: kim, ne zaman, kaçıncı turda, hangi motorda, kaç token, ne kadar sürede.
 - Maliyeti dengelemek: ağır kodlama yerelde (Qwen), muhakeme ve onay Claude'da.
 - Ölçerek büyümek: yeni ajan, ölçülen bir hata türünü yakalamak için eklenir. "Daha çok ajan daha iyidir" varsayımı yok.
@@ -115,7 +122,11 @@ flowchart TD
     SN --> TK{"Test komutu<br/>(varsa)"}
     TK -->|kırmızı| B["Bulgular"]
     TK -->|yeşil| KU{"Onay kurulu<br/>paralel"}
-    KU -->|hepsi ONAY| IL["İlerle<br/>gerekirse kilitle"]
+    KU -->|hepsi ONAY| BB{"Büyük Birader<br/>işin tamamına bakar"}
+    BB -->|VETO, kanıtla| B
+    BB -->|UYGUN ya da DİKKAT| KP[["Senin kapın<br/>kararları onayla ya da değiştir"]]
+    KP -->|değiştir| U
+    KP -->|onay| IL["Tamamla ve ilerle<br/>kilit, ADR"]
     KU -->|DÜZELT| B
     KU -->|SORU| OK2{"Ekip oylar"}
     OK2 -->|oybirliği| U
@@ -127,6 +138,7 @@ flowchart TD
 ```
 
 - Kırmızı koda onay kurulu çağrılmaz; önce testler yeşile döner.
+- Onay kurulu geçirdikten sonra **Büyük Birader** bakar, sonra (o aşamada kapı açıksa) **karar sana gelir**; kilitler ve mimari karar kayıtları ancak senin onayından sonra yazılır. Ayrıntı: [Büyük Birader ve onay kapıları](#büyük-birader-ve-onay-kapıları).
 - Bulgular, üreten ajana bir sonraki turda "Düzeltme istekleri" olarak gider; önceki çıktısı da yanında gider, belgeyi baştan yazmaz.
 - **Belge bütünlüğü.** Revizyonda yeni belge öncekinin tamamı olmalı. Önceki sürümdeki bir kimlik (E5, H2, K3, FARK-1...) yeni sürümde yoksa ya da belge yarıdan fazla kısaldıysa, sistem belgeyi onay kuruluna göndermeden geri çevirir ve önceki sürümü yeniden yürürlüğe koyar. Bir kural bilerek kaldırılıyorsa kimliği "Kaldırılanlar" bölümünde yazılır.
 - **Sorular sana anlaşılır gelir.** Ajanlara, soruyu belgeyi görmemiş birine sorar gibi yazmaları söylenir: E18, H1 gibi kimlikler tek başına kullanılmaz, dosya ve satır numarası soruya girmez, somut bir örnek verilir.
@@ -201,6 +213,9 @@ Tam yığın akış yukarıdaki gibi. Standart akışta UX ve FE kalemleri yok. 
 | **Standart (BE)** | arayüzsüz işler | planlama (6 aşama) → kalemler → birleştirme → teslim → kabul → gelişim | ~64 |
 | **Tam yığın (FE+BE)** | arayüzlü işler | yukarıdaki + UX tasarım, FE kalemleri | ~64 |
 | **Replatform** | var olan bir sistemi yeniden yazmak | mevcut sistemi anlama → kapsam → hedef analiz → teknik plan → teslim planı → testler → kalemler → birleştirme → entegrasyon kılavuzu → teslim → kabul → gelişim | ~77 |
+| **Mevcut proje üzerinde iş** | var olan projede hata, özellik, entegrasyon | keşif → öneri kartı → baz çizgisi → (küçük: kıran test → düzeltme) ya da (orta, büyük: fark analizi → teslim planı → kalemler → birleştirme) → değişiklik notu → kabul → yama | 11 (küçük iş) |
+
+Yeni fikir ekranında akışı değil, **nereden başladığını** seçersin: *Sıfırdan* (Mini, Standart, Tam yığın arasından seçersin), *Mevcut proje üzerinde iş* ya da *Mevcut sistemi yeniden yaz*. Son ikisinde akış seçimi yoktur.
 
 Derin planlama bilerek pahalı: kod yazılmadan önce kapsam, analiz, plan ve testler onaylanmış olur. Küçük işi tam yığına sokma; her soru ve düzeltme turu birkaç çağrı ekler.
 
@@ -220,6 +235,13 @@ Derin planlama bilerek pahalı: kod yazılmadan önce kapsam, analiz, plan ve te
 | **Ortak karar** | orkestratör (`ortak_karar`) | Sorular önce kurulda oylanır; oybirliği yoksa, oy okunamazsa ya da biri "sahibine bırak" derse sana gelir |
 | **Salt okunur kaynak** | kilit + salt okunur aşama | Eski sistemin kopyasına kimse yazamaz; Mevcut Sistem Analisti hiçbir dosyaya yazamaz, yazarsa geri alınır |
 | **Kod atıfları** | atıf denetimi | Mevcut sistem analizindeki her `kaynak/<dosya>:<satır>` gerçek bir dosya ve satıra gitmeli; uydurma atıf onay kuruluna gitmeden geri döner |
+| **Büyük Birader** | onay kurulundan sonra, salt okunur | İşin tamamına bakar; veto kanıt ister, senin kararını veto edemez, aşama başına veto sınırı var, hiçbir şeye yazamaz |
+| **Onay kapısı** | orkestratör (`katilim`) | Kapı açık aşamada kararları onaylamadan aşama tamamlanmaz; kilit ve mimari karar kayıtları onaydan sonra yazılır |
+| **Konuşma** | salt okunur çağrı | Soru sorulan ajan dosya yazamaz, komut çalıştıramaz; cevabı sen karara bağlamadan hiçbir şey değişmez |
+| **Öneri kartı** | keşif + senin onayın | Mevcut projede ajanların yazma alanı keşiften gelir ve **sen onaylamadan** yürürlüğe girmez; yollar `proje/` altında olmalı, projenin tamamı verilemez, projede karşılığı olmayan yol geri döner |
+| **Baz çizgisi** | ajansız kontrol aşaması | Projenin testleri işe başlamadan koşar; kırmızıysa iş başlamaz (hangi hatanın bu işten geldiği ayırt edilemezdi) |
+| **Önce kırmızı** | `beklenen: kirmizi` | Yeni test, kod yazılmadan önce başarısız olmalı; geçiyorsa isteneni yakalamıyordur ve onay kuruluna gitmeden yazara döner |
+| **Projeye dokunmama** | kopya + yama | Verdiğin klasöre ve sürüm kontrolüne yazılmaz; sır taşıyabilecek dosyalar (`.env`, anahtar, sertifika) kopyalanmaz |
 | **Hepsi yerel** | motor seçimi | Oylar ve onaylar dahil hiçbir çağrı buluta gitmez; yerel motor yoksa iş durur, Claude'a düşülmez |
 | **Kurum LLM'inde araçlar** | Kovan'ın ajan döngüsü | Yollar çalışma dizinine hapsedilir (`..`, mutlak yol, sembolik bağ); Bash yalnızca kartın izinli kalıplarına uyan komutları çalıştırır, `$( )` reddedilir; API anahtarı istemde, günlükte ve Bash'in ortamında yok |
 | **Plan biçimi** | `kovan-plan` denetimi | Kalem kimlikleri, yazılımcı, bağımlılık ve döngü sistemce denetlenir; bozuk plan onay kuruluna gitmeden düzeltmeye döner |
@@ -236,23 +258,27 @@ kovan/
 ├─ Baslat.command      çift tıkla (macOS)
 ├─ Ollama-Kur.command  Qwen hibrit için tek tık kurulum (macOS)
 ├─ kovan.yaml          ayarlar: mod, yerel motor, paralel iş, ajan soruları, ortak karar
-├─ ajanlar/            12 ajan kartı
-├─ akislar/            mini, standart, tam-yigin, replatform
-├─ ornekler/           reeskont-eski: replatformu denemek için kurgusal eski sistem
+├─ ajanlar/            13 ajan kartı (12 ekip üyesi ve Büyük Birader)
+├─ akislar/            mini, standart, tam-yigin, proje, replatform
+├─ ornekler/           reeskont-eski: replatform için kurgusal eski sistem; proje-ornek: mevcut proje işi için küçük, hatalı bir proje
 ├─ sunucu/src/         Node.js + TypeScript sunucu ve orkestratör
 ├─ sunucu/test/        Vitest testleri
 ├─ arayuz/             Vite + React + TypeScript arayüz (derlenmiş hali arayuz/dist)
 └─ calisma/            (git'te yok) fikirlerin çıktıları
    └─ F-001/
-      ├─ belgeler/     brif, analiz, planlar, kalem notları, kararlar.md, gelisim-defteri.md  (_surumler/ eski sürümler)
+      ├─ belgeler/     brif, analiz, planlar, kalem notları, kararlar.md, onaylar.md, birader-defteri.md, gelisim-defteri.md  (_surumler/ eski sürümler)
       ├─ incelemeler/  her ONAY / DÜZELT / SORU kararı
       ├─ kod/          ÜRÜN: backend/  frontend/  testler/  adr/ (kilitli)  kaynak/ (replatform, kilitli)  tasarim/  test-be.sh  test-fe.sh
+      │                mevcut proje işinde: proje/ (çalışma kopyası)  kaynak/ (ekler, kilitli)
+      ├─ cikti/        mevcut proje işinde: degisiklik.patch, OKU.md, degisiklik-notu.md, dosyalar/ (yamaya girmeyenler)
       ├─ gunluk/       her çağrının tam istemi, komutu ve ham çıktısı
-      └─ .kovan/       fikir.json, adimlar.json, kararlar.json, plan.json, adr.json, gelisim.json, kilit kaydı, anlık kopya
+      └─ .kovan/       fikir.json, adimlar.json, kararlar.json, plan.json, adr.json, gelisim.json, kilit kaydı, anlık kopya;
+                       onaylar.json, birader.json, sohbet.json;
+                       mevcut proje işinde is.json (onaylanan öneri kartı), yama.json, proje-asil/ (dokunulmamış kopya)
    └─ .cop/            silinen fikirler (F-004-20261119...); geri almak için klasörü calisma/ altına geri taşı ve Kovan'ı yeniden başlat
 ```
 
-**Ürün nerede?** Fikir ekranında başlığın altında klasörün yolu yazar; **Kodu aç** düğmesi `kod/` klasörünü Finder'da (Windows'ta Explorer) açar. Ekranda **Dosyalar** panelinin **Kod** sekmesinde de dosyaları okuyabilirsin. Ürünü kendi deposuna almak için `kod/` altındaki `backend/`, `frontend/`, `testler/` ve `adr/` klasörlerini kopyala; `kaynak/` eski sistemin kopyasıdır, ürüne girmez.
+**Ürün nerede?** Fikir ekranında başlığın altında klasörün yolu yazar; **Kodu aç** düğmesi `kod/` klasörünü Finder'da (Windows'ta Explorer) açar. Ekranda **Dosyalar** panelinin **Kod** sekmesinde de dosyaları okuyabilirsin. Ürünü kendi deposuna almak için `kod/` altındaki `backend/`, `frontend/`, `testler/` ve `adr/` klasörlerini kopyala; `kaynak/` eski sistemin kopyasıdır, ürüne girmez. Mevcut proje işinde ürün `kod/` değil **yamadır**: `cikti/degisiklik.patch` (bkz. [Mevcut proje üzerinde iş](#mevcut-proje-üzerinde-iş-hata-özellik-entegrasyon)).
 
 **Fikir silmek.** Fikir ekranında **Sil**: fikir listeden kalkar, klasörü `calisma/.cop/` altına taşınır (kalıcı silme yok). Çalışan fikir silinmez; önce **Durdur**. Silinen fikrin numarası yeniden kullanılmaz.
 
@@ -321,6 +347,9 @@ Ayarlar (`kovan.yaml`): `ortak_karar.kurul` (kimler oylar), `ortak_karar.kural` 
 
 | Durum | Seçenekler (önerilen ilk) |
 |---|---|
+| Aşama sonu kapısı | her karar için Onaylıyorum · Değiştir (notla); mimari kararda seçeneklerden biri |
+| Büyük Birader veto sınırı | Bir tur daha · Olduğu gibi kabul et · Durdur |
+| Büyük Birader değerlendiremedi | Tekrar dene · Bu aşamada Büyük Birader olmadan devam et · Durdur |
 | Teslim (insan kapısı) | Kabul ediyorum · Notumla geri gönder (hangi aşamaya) · Durdur |
 | Tur sınırı | Bir tur daha (hibritte yerel aşamada önce: Bu aşamayı Claude'a devret) · Olduğu gibi kabul et · Durdur |
 | Kalıcı hata | Tekrar dene · Claude'a devret (yerel aşamada) · Bu aşamayı atla · Durdur |
@@ -341,6 +370,73 @@ Bunlar her analiz aşamasına bir soru turu ekler: biraz daha uzun sürer ve bir
 **Seni darlamasınlar diye:** sorular önce ekipte çözülür; bir aşamada en fazla `en_fazla_soru_turu` (varsayılan 2) soru turu açılır. Hak dolunca ajanlara "VARSAYIM yaz, devam et" denir. Soruları tamamen kapatmak için `kovan.yaml`'da `ajan_sorulari: false`.
 
 **Haberin olsun diye:** bir fikir seni beklediğinde sekme başlığı "(N) Kovan" olur; üst çubuktaki **Bildirim al** ile sekme arka plandayken masaüstü bildirimi gelir.
+
+---
+
+## Büyük Birader ve onay kapıları
+
+Teslimde tek bir "kabul ediyorum" geç kalır: o noktada kapsam, analiz ve mimari çoktan kilitlenmiştir. Bu yüzden her aşama, onay kurulundan geçtikten sonra iki göze daha uğrar: önce işin tamamını gören Büyük Birader'e, sonra sana.
+
+```mermaid
+flowchart LR
+    U["Üret"] --> D["Doğrula<br/>testler, onay kurulu"] --> BB{"Büyük Birader<br/>işin tamamı"}
+    BB -->|"VETO (kanıtla)"| U
+    BB -->|"UYGUN · DİKKAT"| K[["Senin kapın<br/>kararlar madde madde"]]
+    K -->|"Değiştir + not"| U
+    K -->|"hepsi onay"| T["Tamamla<br/>kilit, ADR"] --> S["Sonraki aşama"]
+    K -.->|"Ajanla konuş"| K
+```
+
+### Büyük Birader
+Adını 1984'ten alır ama son söz onda değil, sendedir. Ekipteki herkes yalnızca kendi aşamasının girdilerini görür; Büyük Birader **işin tamamını** görür: fikir, bütün belgeler, karar defteri, onayların, onay kurulunun incelemeleri, test sonuçları ve aşama aşama gidişat (tur sayıları, sınır ihlalleri, izin retleri). Ekranda petek şeridinin tepesindeki gözdür: rengi son hükmünü gösterir, bakışı o anki aşamaya döner, tıklayınca aşama aşama değerlendirmeleri açılır.
+
+Aşamanın kendi içindeki kaliteye onay kurulu bakar; Büyük Birader aşamalar **arasına** bakar: kapsamdan sapma, alınmış bir kararla çelişki, girdide dayanağı olmayan iddia, karşılanamaz hale gelen kabul kriteri, yok sayılan güvenlik ya da mevzuat kararı.
+
+| Hüküm | Ne olur |
+|---|---|
+| **Uygun** | Aşama senin kapına gelir (kapı yoksa ilerler). |
+| **Dikkat** | Akışı durdurmaz. Uyarı tepede ve kapı kartında görünür. Sorun önceki, onaylanmış bir aşamadaysa hangi aşamaya geri göndermeni önerdiğini söyler; geri göndermek senin kararın. |
+| **Veto** | Aşama, kanıtlı bulgularla yazarına geri döner. Onay kurulu yeniden bakmaz (onayları korunur); Büyük Birader yeniden bakar. Veto turu aşamanın tur hakkından yemez. |
+
+Veto gücünün sınırları:
+- **Kanıt ister.** Her veto bulgusu bir belgeye ya da aşamaya ve oradaki ifadeye dayanmalı. Kanıtsız veto sistemce Dikkat'e düşürülür ve aşama geri çevrilmez.
+- **Senin kararını veto edemez.** "Alınan kararlar" bağlayıcıdır; yanlış bulursa Dikkat ile söyler.
+- **Üslubu, biçimi, tercih farkını veto edemez;** onay kurulunun baktığı aşama içi ayrıntıyı yeniden tartışmaz.
+- **Akışı kilitleyemez.** Bir aşamada en fazla `en_fazla_veto` (varsayılan 2) veto; sonrakinde karar sana gelir (bir tur daha, olduğu gibi kabul et, durdur). Değerlendirme alınamazsa da akış durmaz: tekrar dene ya da o aşamada onsuz devam et.
+- **Hiçbir şeye yazamaz.** Araçları yalnızca okuma (`Read`, `Glob`, `Grep`); ajanlara talimat veremez, yalnızca hükmünü yazar.
+
+Değerlendirmeleri `belgeler/birader-defteri.md` dosyasında birikir ve bir sonraki değerlendirmesine girer. Bir çağrısı her aşama turuna eklenir; Tam yığında üç kalemle kabaca 17-20 ek çağrı demektir. Claude'daki ucuz inceleme modeli (`claude_inceleme_modeli`) ona uygulanmaz. **Hepsi yerel** modunda yazarla aynı modelde koşar; "farklı model farklı hatayı yakalar" ilkesi yalnızca Hibrit'te tam işler.
+
+Ayar: `kovan.yaml` → `buyuk_birader: { acik: true, en_fazla_veto: 2 }` (kısaca `buyuk_birader: false`). Bir akışta kapatmak için akış dosyasına `buyuk_birader: false` (Mini'de kapalı). Kartı: `ajanlar/buyuk-birader.md`.
+
+### Onay kapıları
+Kapı açık olan bir aşama bitince o aşamada **karara bağlananlar madde madde** önüne gelir. Her ajan belgesinin sonuna bir karar özeti yazar (`kovan-ozet`: ne karara bağlandı, neden, alternatifi neydi; varsayımlar ve kapsam maddeleri ayrı ayrı). Kart şöyle görünür:
+
+- En üstte **Büyük Birader'in değerlendirmesi**.
+- Her karar için **Onaylıyorum** ya da **Değiştir**. Not yazdığın madde değişiklik isteği sayılır.
+- **Mimari kararlar seçenekleriyle** gelir: Mimar seçenekleri artısı ve eksisiyle hazırlar, birini önerir; **seçimi sen yaparsın**.
+- Son madde **Belgenin geneli**: özette olmayan bir şeyi buradan istersin.
+
+Hepsini onaylarsan aşama tamamlanır: kilitler ve mimari karar kayıtları (`adr/`) o anda yazılır, onayın `belgeler/onaylar.md` dosyasına geçer. Bir maddeyi değiştirirsen aynı aşama notlarınla yeniden çalışır; onay kurulu ve Büyük Birader yeniden bakar, kapı yeniden açılır. Senin istediğin tur, aşamanın tur hakkından yemez. Değiştirdiklerin karar defterine "senin kararın" olarak girer ve sonraki bütün ajanlar için bağlayıcıdır; onayladıkların deftere girmez (belgenin kendisinde durur), yoksa defter her isteme eklendiği için büyür.
+
+Kapının hangi aşamalarda açılacağını fikri başlatırken seçersin; fikrin sayfasından sonradan değiştirebilirsin:
+
+| Onay kapıları | Kapı nerede açılır |
+|---|---|
+| **Planlama aşamalarında** (varsayılan) | Kapsam, analiz, UX tasarım, teknik plan, teslim planı (akış dosyasında `kapi: true` olan aşamalar). Kod aşamaları kendi akar. |
+| **Her aşamada** | Test ve kod aşamaları dahil her ajan aşaması. En çok söz, en çok bekleme. |
+| **Yalnızca sonda** | Kapı yok; yalnızca ajanların soruları ve Kabul sana gelir. |
+
+Ayrıca teknik planda `once_soru` açıktır: Mimar planı yazmadan **önce** en çok şeyi değiştiren 1-3 mimari seçimi sana getirir; planı senin cevabınla yazar.
+
+Varsayılan: `kovan.yaml` → `katilim: planlama`.
+
+### Ajanla konuşmak
+Fikir çalışmıyorken (kapıda, durdurulmuşken ya da bittiğinde) fikrin sayfasındaki **Ajanlarla konuş** bölümünden, belgesi yazılmış herhangi bir aşamanın ajanına ya da Büyük Birader'e soru sorarsın: "Bunu neden böyle seçtin?", "Öbür yol neye mal olurdu?", "Bu iş nereye gidiyor?".
+
+- Ajan belgesini (kod aşamasında ve Büyük Birader'de dosyaları da) okuyarak cevaplar. **Hiçbir şeyi değiştiremez**: yazma ve komut aracı yoktur.
+- Cevap bir karar değildir. Vardığınız sonucu **Karara bağla** ile bir cümle olarak yazarsan deftere "senin kararın" olarak girer ve sonraki bütün ajanlar görür. Aşamanın o karara göre yeniden yazılmasını istiyorsan kapıda **Değiştir** dersin.
+- Her soru bir model çağrısıdır: bütçeye ve zaman çizelgesine girer, yerel modelde dakikalar sürebilir. Aynı anda fikir başına tek soru.
 
 ---
 
@@ -504,6 +600,79 @@ Kurum içi bir sistemse önce kurumunun politikasına bak. Buluta gitmemesi gere
 - Tablo tanımlarını (DDL) ve parametre tablolarından örnekleri ekle; veri modeli oradan çıkar.
 - Eski sistemin bir günlük girdi ve çıktısını, anonimleştirerek, CSV olarak koy: altın test onu kullanır.
 - `.doc` belgeyi `.docx` olarak kaydet.
+
+---
+
+## Mevcut proje üzerinde iş: hata, özellik, entegrasyon
+
+Bir ürün teslim edilince iş bitmez: canlıdan hata gelir, yeni özellik istenir, başka bir ekibin sistemine bağlanmak gerekir. Bu başlangıçta Kovan'a sıfırdan ürün yazdırmazsın; **var olan projenin üzerinde bir iş** yaptırırsın. Proje Kovan'ın ürettiği bir şey olmak zorunda değil: bu makinede klasörü olan her proje olur.
+
+```mermaid
+flowchart TB
+    subgraph G0 ["Sen verirsin"]
+        direction LR
+        Y(["Proje klasörü"]) ~~~ I(["İstek"]) ~~~ E(["Ekler: sözleşme,<br/>hata detayı, test senaryosu"])
+    end
+    G0 --> K["Keşif<br/>MSA, salt okunur, koda atıflı"] --> O[["Öneri kartı<br/>tür, boyut, test komutu, yazma alanı: sen onaylarsın"]] --> B["Baz çizgisi<br/>projenin testleri yeşil mi"]
+    B --> KU["Küçük<br/>kıran test (önce kırmızı, kilitli) → düzeltme"]
+    B --> OR["Orta<br/>fark analizi → teslim planı → kalemler → birleştirme"]
+    B --> BU["Büyük<br/>orta + teknik plan, ADR, (arayüz varsa) UX"]
+    KU --> D["Değişiklik notu"]
+    OR --> D
+    BU --> D
+    D --> KA[["Kabul<br/>sen"]] --> P(["Yama: cikti/degisiklik.patch"])
+```
+
+### Ne verirsin
+Yeni fikirde **Mevcut proje üzerinde iş**'i seç:
+- **Proje klasörü**: projenin bu makinedeki kökü (`pom.xml`, `build.gradle` ya da `package.json`'ın olduğu yer). **Klasör seç** ile de verebilirsin.
+- **İstek**: ne yapılsın. Hatada: ne bekleniyordu, ne oldu, nasıl yeniden üretilir. Entegrasyonda: hangi sistemle, hangi işlem için.
+- **Ekler** (isteğe bağlı): entegrasyon sözleşmesi (OpenAPI, WSDL, tablo ya da dosya biçimi, örnek istek ve cevap), hata detayı ve log, test senaryoları, analiz notu. Ekler `kod/kaynak/` altına alınır ve kilitlenir; ajanlar okur, atıf verir, değiştiremez.
+
+Akış, tür ya da boyut seçmezsin; onu keşif önerir.
+
+Kovan projenin **birebir kopyası** üzerinde çalışır (kodlama çevirisi yapılmaz); verdiğin klasöre ve sürüm kontrolüne dokunmaz. `.git`, `node_modules`, `target`, `build` gibi klasörler ve sır taşıyabilecek dosyalar (`.env`, `.pem`, `.key`, `.jks`...) kopyalanmaz. Sınır: 5.000 dosya, toplam 200 MB (derleme çıktıları ve bağımlılıklar sayılmaz).
+
+### Öneri kartı
+Keşif (Mevcut Sistem Analisti, salt okunur) isteği ve ekleri okur, projede işin geçtiği yeri bulur ve bunu `proje/<dosya>:<satır>` atıflarıyla yazar; sistem her atfı denetler. Belgenin sonunda iş önerisi vardır. Onay kurulundan geçince öneri sana **tek bir kart** olarak gelir:
+
+| Soru | Ne belirler |
+|---|---|
+| **İş türü**: hata düzeltme, yeni özellik, entegrasyon | Ajanlara giden yönergeyi. Hatada kök neden ve en küçük değişiklik; entegrasyonda sözleşmeden sahte karşı taraf, gerçek ağa çıkmama, bağlantı bilgisinin yalnızca yapılandırmadan okunması |
+| **Boyut**: küçük, orta, büyük | Koşacak aşamaları (yukarıdaki üç yol). Küçük iş tek tarafta (BE ya da FE) olur |
+| **Test komutu** | Projenin testlerini koşan komutu. Kovan projenin yapısından önerir (`./mvnw -q test`, `mvn -q test`, `./gradlew test`, `gradle test`, `npm test`); kendi komutunu yazabilirsin. Proje kökünde koşar |
+| **Yazma alanı** | Ajanların yazabileceği klasör ve dosyaları (`proje/` altında) ve yeni testlerin yerini. Uygun değilse onaylama, ne değişsin yaz: keşif notunla yeniden çalışır |
+
+Kartı onaylamadan kod yazılmaz. Yazma alanının dışındaki her değişiklik sistemce geri alınır ve sınır ihlali olarak kaydedilir.
+
+### Verdiğin her şey bir güvenceye dönüşür
+- **Baz çizgisi.** İş başlamadan projenin testleri koşar. Kırmızıysa iş başlamaz; komutu daraltır (ör. yalnızca ilgili modül) ya da durdurursun.
+- **Önce kırmızı.** Yeni test (küçük işte *kıran test*, kalemlerde *kabul testi*) kod yazılmadan önce yazılır ve sistem onu koşar: **başarısız olmalı**. Geçiyorsa hatayı ya da isteği yakalamıyordur; onay kuruluna gitmeden yazara döner. Onay kurulu, testin doğru sebeple kırmızı olup olmadığına test çıktısıyla bakar. Sonra test kilitlenir. Kod yazıldıktan sonra teste geri dönersen (ör. kabulden "notumla geri gönder") kırmızı beklenmez; düzeltilen test, kod aşaması yeniden doğrulanırken yeşil olarak koşar.
+- **Sonra yeşil.** Yazılımcı yalnızca yazma alanına yazar; kilitli yeni testler ve projenin mevcut testleri birlikte yeşil olmalıdır. Mevcut Sistem Analisti her kod aşamasında "korunması gereken bir davranış bozuldu mu" diye bakar.
+- **Test senaryoların.** Eklerde verdiğin her senaryo bir teste çevrilir; hatada, hatayı yeniden üreten girdi aynen kullanılır.
+
+### Çıktı: yama
+Kabul aşamasında ve iş bitince `cikti/` klasörü hazırdır (fikir ekranında **Yamayı aç**, Dosyalar panelinde **Yama** sekmesi):
+
+| Dosya | Ne |
+|---|---|
+| `degisiklik.patch` | Birleşik diff. Projenin kökünde `git apply degisiklik.patch`; git yoksa `patch -p1 < degisiklik.patch` |
+| `OKU.md` | Nasıl uygulanır, hangi dosyalar değişti |
+| `degisiklik-notu.md` | Ne istendi, ne değişti ve neden, nasıl test edildi, projeye alınırken yapılacaklar, geri alma, riskler |
+| `dosyalar/` | Yamaya girmeyenler: ikili ve UTF-8 olmayan dosyaların yeni halleri (elle kopyalanır) |
+
+Sonraki istek için yamayı projene uygula ve aynı klasörle yeni bir iş başlat. Bu başlangıçta "yeni sürüm" yoktur; her iş kendi yamasıyla biter.
+
+### Bilinen sınırlar
+- Test komutu senin makinende çalışabilmelidir: derleme aracı ve bağımlılıklar hazır olmalı. `node_modules` kopyalanmaz; gerekiyorsa komutu kurulumla başlat (`npm ci && npm test`).
+- Kovan karşı ekibin sistemine bağlanmaz: entegrasyonda testler sözleşmeden üretilmiş sahte karşı tarafla koşar. Gerçek bağlantıyı sen denersin; değişiklik notu bunu "projeye alınırken yapılacaklar"da hatırlatır.
+- Eklere parola ya da anahtar koyma; bağlantı bilgisi gerekiyorsa yalnızca ortam değişkeninin adını yaz. Hibrit ve Hepsi Claude modlarında proje ve ekler Claude'a gider (bkz. [Gizlilik](#gizlilik-hangi-modda-ne-makineden-çıkar)).
+- UTF-8 olmayan dosyaları (ör. Windows-1254) ajan değiştirirse kodlama bozulabilir; bu dosyalar yamaya girmez, `dosyalar/` altında ayrıca teslim edilir ve notta listelenir. Uygulamadan önce gözle kontrol et.
+- Sınır denetimi her ajan çağrısından önce çalışma kopyasının kopyasını alır; büyük projede bu yavaşlatır. İşin geçtiği modülün klasörünü vermek en hızlısıdır.
+- Deneme modu yalnızca Kovan'la gelen `ornekler/proje-ornek` ile gerçek bir değişiklik yapar.
+
+### Örnekle dene
+`ornekler/proje-ornek` uydurma, küçük bir taksit hesabı projesidir ve bilerek bırakılmış bir hatası vardır (kalan kuruş kaybolur). Yeni fikirde **Taksit planında kalan kuruş** örneğini seç; Deneme modunda token harcamadan kartı, kıran testi ve yamayı görürsün.
 
 ---
 
@@ -692,6 +861,7 @@ Dış dosyada yazdığın her üst anahtar repodaki `kovan.yaml`'ın aynı anaht
 | Yazılımcı BE (BCKD) | **Qwen (yerel)** | `backend/` | – | – |
 | Yazılımcı FE (FE) | **Qwen (yerel)** | `frontend/` | – | – |
 | Güvenlik (SCRT) | Claude | – | teknik plan, kod (yalnızca KRİTİK/YÜKSEK için DÜZELT) | – |
+| **Büyük Birader (BB)** | Claude | – | onay kurulunda değil, üstünde: her aşamada kuruldan sonra işin tamamına bakar; Uygun, Dikkat ya da Veto | – |
 | Mevzuat ve Uyum (UYUM) | Claude | – | analiz; konu varsa UX ve teknik plan | – |
 | Mevcut Sistem Analisti (MSA) | Claude | replatformda mevcut sistem analizi (salt okunur, koda atıflı) | hedef analiz, teknik plan, test senaryoları, kabul testleri, kod ve entegrasyon kılavuzu (eşdeğerlik) | – |
 
@@ -728,8 +898,10 @@ Yeni fikirde bir **hedef yığın** seçersen (Java 21 + Spring Boot vb., bkz. [
 - **Ajan başına farklı yerel model:** kartta `yerel_model: qwen3.6:27b` gibi bir satır ekle.
 - **Yeni akış:** bir YAML'ı kopyala. Aşama ekle, `dogrulama` altına inceleyen ya da komut ekle, `yazabilir` ile yazma alanını ver.
 - **Kalem adımları:** `tur: kalemler` aşamasındaki `adimlar` her kalem için tekrarlanır. Yer tutucular: `{kalem}` (P1), `{kalem_kucuk}` (p1), `{baslik}`, `{kapsam}`, `{kabul}`, `{bagimli}`, `{gelistirici}`, `{alan}` (backend), `{taraf}` (be). Bir onaycıyı yalnızca bir taraftaki kalemlerde çalıştırmak için `taraf: fe`.
+- **Onay kapısı ve Büyük Birader:** aşamaya `kapi: true` yazarsan "Planlama aşamalarında" seçiliyken o aşamanın sonunda kararlar sana gelir. Akışın başına `buyuk_birader: false` yazarsan o akışta Büyük Birader çalışmaz. Kapı ya da Büyük Birader açıkken her ajan çıktısının sonunda `kovan-ozet` bloğu istenir ve sistemce denetlenir.
+- **Mevcut proje akışı** (`kaynak: proje`): ilk aşama `tur: kesif` olmalı. `kosul: { boyut: [orta, buyuk], taraf: [fe] }` aşamayı yalnızca o işlerde koşturur; `tur: kontrol` ajansız bir komut aşamasıdır; komut doğrulayıcısında `dizin: proje` komutu proje kökünde, `beklenen: kirmizi` ise "başarısız olmalı" diye koşturur. Yer tutucular öneri kartından dolar: `{test_komutu}`, `{yazma_alani}`, `{test_alani}`. Kod yazan her aşamada `yazabilir` zorunludur.
 - **Atlanabilir onaycı:** `atlanabilir: true` olan onaycı, fikir için bir kez "kapsam dışı" dediyse sonraki aşamalarda çağrılmaz (Mevzuat böyle).
-- **Kural:** Yeni bir ajanı, ölçtüğün bir hata türünü yakalamak için ekle. Her yeni devir bağlam kaybı, süre ve maliyet getirir.
+- **Kural:** Yeni bir ajanı, ölçtüğün bir hata türünü yakalamak için ekle. Her yeni devir bağlam kaybı, süre ve maliyet getirir. (Büyük Birader bu kuralın bilinçli istisnası: aşamalar arası tutarlılığa bakan başka kimse yok. Vetolarının kaçının haklı çıktığını `belgeler/birader-defteri.md`'den izle.)
 
 ---
 
@@ -779,6 +951,22 @@ Claude Code ile geliştiriyorsan proje kuralları ve yapı `CLAUDE.md`'de; kişi
 | "Model sunucuda yok" | `model` değeri `GET /v1/models`'taki `id` ile birebir aynı olmalı |
 | Kurum LLM'inde ajan araç çağırmıyor, düz metin yazıyor | Sunucuda tool calling kapalı olabilir; `arac_bicimi: metin` dene ya da vLLM'i `--enable-auto-tool-choice --tool-call-parser qwen3_coder` ile aç |
 | "Kaynak çok büyük" | Yalnızca taşınacak işin klasörlerini ver; sınır 5.000 dosya, toplam 200 MB |
+| "Proje çok büyük" | İşin geçtiği modülün klasörünü ver; sınır 5.000 dosya, toplam 200 MB (derleme çıktıları ve bağımlılıklar sayılmaz) |
+| "Proje klasörü bulunamadı" / "Proje yolu bir klasör olmalı" | Projenin bu makinedeki kökünü ver; tek dosya ya da zip değil, klasör |
+| "Baz çizgisi: projenin testleri işe başlamadan kırmızı" | Proje zaten kırık ya da komut bu makinede çalışmıyor. **Test komutunu değiştir** ile komutu daralt (ör. `mvn -q test -pl hesap-modulu`) ya da kurulum ekle (`npm ci && npm test`); ayrıntıdaki çıktıya bak |
+| "Önce kırmızı: YEŞİL (kırmızı bekleniyordu)" | Yeni test bugünkü kodda geçiyor: ya isteneni yakalamıyor ya da test komutun yeni testin klasörünü koşmuyor. Tur sınırına gelirse test komutunu ve öneri kartındaki test alanını kontrol et |
+| "İş önerisi: GEÇERSİZ" | Keşfin `kovan-is` bloğu eksik, yazma yolu `proje/` dışında ya da projede karşılığı yok; sistem bulguyu keşfe geri gönderir, genelde sonraki turda düzelir |
+| "Karar özeti: GEÇERSİZ" | Ajan çıktısının sonuna `kovan-ozet` bloğunu yazmamış ya da eksik yazmış; bulgu ajana döner, genelde sonraki turda düzelir. Zayıf bir yerel modelde tekrarlıyorsa daha büyük model dene ya da o fikirde onay kapılarını "Yalnızca sonda" yapıp `buyuk_birader: false` ile Büyük Birader'i kapat (özet o zaman istenmez) |
+| "Büyük Birader ... aşamasını N. kez veto etti" | Veto sınırı doldu, karar sende. Bulguyu oku: haklıysa **Bir tur daha**, değilse **Olduğu gibi kabul et**. Sık oluyorsa `en_fazla_veto`'yu düşür ya da kartındaki veto ölçütlerini daralt |
+| "Büyük Birader ... aşamasını değerlendiremedi" | Modeli cevap vermedi ya da hükmü okunamadı. **Tekrar dene** ya da **Bu aşamada Büyük Birader olmadan devam et**; sonraki aşamalarda yine bakar |
+| "Kanıtsız veto" notu | Büyük Birader veto etti ama dayanak göstermedi; sistem hükmü Dikkat'e düşürdü ve aşamayı geri çevirmedi |
+| Kapıda "neyin değişmesini istediğini yaz" | **Değiştir** seçtin ama not yazmadın; ajan neyi değiştireceğini notundan öğrenir |
+| "Fikir çalışırken soru sorulamaz" | Ajana soru yalnızca fikir beklerken, durdurulmuşken ya da bittiğinde sorulur; kapıyı bekle ya da **Durdur** |
+| Her aşamada durup bana soruyor, çok yavaş | Fikrin sayfasında **Onay kapıları**'nı "Yalnızca sonda" yap; sonraki aşamalardan itibaren geçerli olur |
+| "Küçük iş tek tarafta olur" | Kartta boyutu küçük seçtin ama keşif iki tarafı (BE ve FE) öneriyor; boyutu orta seç ya da yazma alanını onaylamayıp tek tarafa indirmesini iste |
+| "Test komutu tek satır ve en fazla 300 karakter olmalı" | Komutu tek satırda yaz; uzun kurulumları projedeki bir betiğe taşı (ör. `bash test.sh`) |
+| Yama uygulanmıyor (`git apply` hata veriyor) | Proje, Kovan'a verdiğin halden sonra değişmiş olabilir: `git apply --3way` dene ya da işi güncel klasörle yeniden başlat. `OKU.md`'deki "yamaya girmeyenler"i elle kopyalamayı unutma |
+| Keşif "UTF-8 olmayan dosyalar" diyor | Proje envanterinde listelenir; ajan bu dosyaları değiştirirse yamaya girmez, `cikti/dosyalar/` altında ayrıca çıkar. Kodlamayı gözle kontrol et |
 | "Kaynak atıfları: GEÇERSİZ" | Analist olmayan bir dosyaya ya da satıra atıf vermiş; sistem aşamayı onay kuruluna göndermeden düzeltmeye döndürür. Tekrarlıyorsa tur sınırında karar ver |
 | Hepsi yerel'de analiz zayıf, tur sınırına takılıyor | Daha büyük yerel model (32 GB+ bellekte `qwen3-coder:30b`), daha küçük kaynak (tek iş), akışta `en_fazla_tur`'u artır |
 | Java'da Maven bağımlılıkları inmiyor | İlk test koşumu bağımlılıkları indirir; kurum ağındaysan `~/.m2/settings.xml`'de kurumun deposunu tanımla |
@@ -802,6 +990,12 @@ Kullanım sütunu Claude Code'un tahminidir. Abonelikte faturalanmaz ama kullan�
 - [x] Hepsi yerel modu: kod ve belgeler makineden çıkmaz
 - [x] Kurum içi LLM: OpenAI uyumlu motor, Kovan'ın kendi ajan döngüsü, repo dışından ayar dosyası
 - [x] Mimari karar kayıtları (ADR): seçenekli, makineyle denetlenen, kodda kilitli; replatformda batch/endpoint kararı zorunlu
+- [x] Mevcut proje üzerinde iş: hata, özellik, entegrasyon; keşif ve öneri kartı, baz çizgisi, önce kırmızı test, yama çıktısı
+- [x] Büyük Birader: her aşamanın sonunda işin tamamına bakan, kanıtla veto edebilen göz
+- [x] Aşama sonu onay kapıları: karar özeti madde madde, mimari seçim sende; ajanla konuşma ve karara bağlama
+- [ ] Büyük Birader'in birden çok fikri birlikte izlemesi; vetolarının isabet oranı raporu
+- [ ] Sıfırdan başlangıçta da öneri kartı: Mini, Standart ve Tam yığının tek akışta birleşmesi
+- [ ] Mevcut proje işinde yaşayan belgeler: kuralların ve kararların iş iş birikmesi
 - [ ] Fikir başına git deposu: tur tur diff ve geri alma
 - [ ] Deterministik güvenlik taramaları onay kurulundan önce (`npm audit`, `semgrep`, `gitleaks`)
 - [ ] Qwen Code motoru: Qwen modellerini kendi harness'ında çalıştırma seçeneği

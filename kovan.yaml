@@ -71,3 +71,19 @@ ortak_karar:
   acik: true
   kurul: [urun-sahibi, mimar, analist]
   kural: oybirligi
+
+# Onay kapıları: aşama bitince o aşamada alınan kararlar madde madde sana gelsin mi. Yeni fikrin varsayılanı;
+# fikri başlatırken ve fikrin sayfasından değiştirilebilir.
+#   planlama  : kapsam, analiz, tasarım, teknik plan ve teslim planı sonunda (akışta "kapi: true" olan aşamalar)
+#   her_asama : test ve kod aşamaları dahil her aşamanın sonunda
+#   sonda     : kapı yok; yalnızca ajanların soruları ve en sondaki Kabul sana gelir
+katilim: planlama
+
+# Büyük Birader: her aşamanın sonunda, onay kurulundan sonra işin tamamına bakar (bütün belgeler, kararlar,
+# incelemeler, testler). Kapsamdan sapma, kararlarla çelişki ya da uydurma iddia görürse aşamayı kanıtıyla veto eder;
+# aşama yazarına geri döner. Hiçbir şeye yazamaz, senin kararını veto edemez. Her aşama turuna bir çağrı ekler.
+#   en_fazla_veto: bir aşamada en fazla kaç veto; dolunca karar sana gelir.
+# Kapatmak için: buyuk_birader: false. Bir akışta kapatmak için akış dosyasına "buyuk_birader: false" (Mini'de kapalı).
+buyuk_birader:
+  acik: true
+  en_fazla_veto: 2

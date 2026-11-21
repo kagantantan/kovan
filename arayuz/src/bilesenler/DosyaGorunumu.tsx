@@ -6,13 +6,13 @@ import { useYokla } from "../kullan";
 import { Markdown, type AtifTiklama } from "./Markdown";
 import { Simge } from "./Simge";
 
-type Sekme = "belgeler" | "incelemeler" | "kod" | "kaynak" | "kararlar" | "adr";
+type Sekme = "belgeler" | "incelemeler" | "kod" | "kaynak" | "proje" | "cikti" | "kararlar" | "adr";
 
 const BELGE_ADI: Record<string, string> = {
-  fikir: "Fikir metni", "kaynak-envanteri": "Kaynak envanteri", "mevcut-sistem": "Mevcut sistem analizi", brif: "Kapsam ve kabul paketi", analiz: "Analiz belgesi", "ux-ozeti": "UX özeti", "teknik-plan": "Teknik plan",
+  fikir: "Fikir metni", "proje-envanteri": "Proje envanteri", "kaynak-envanteri": "Kaynak envanteri", kesif: "Keşif", "mevcut-sistem": "Mevcut sistem analizi", brif: "Kapsam ve kabul paketi", analiz: "Analiz belgesi", "ux-ozeti": "UX özeti", "teknik-plan": "Teknik plan",
   "teslim-plani": "Teslim planı", "test-senaryolari": "Test senaryoları", "test-altyapisi": "Test altyapısı", "test-ozeti": "Test özeti",
-  "be-notu": "Backend notu", "fe-notu": "Frontend notu", birlestirme: "Birleştirme", entegrasyon: "Entegrasyon kılavuzu", teslim: "Teslim paketi",
-  "gelisim-onerileri": "Gelişim önerileri", "gelisim-defteri": "Gelişim defteri", kararlar: "Kararlar",
+  "be-notu": "Backend notu", "fe-notu": "Frontend notu", "kiran-test": "Kıran test", "duzeltme-notu": "Düzeltme notu", birlestirme: "Birleştirme", "degisiklik-notu": "Değişiklik notu", entegrasyon: "Entegrasyon kılavuzu", teslim: "Teslim paketi",
+  "gelisim-onerileri": "Gelişim önerileri", "gelisim-defteri": "Gelişim defteri", kararlar: "Kararlar", onaylar: "Onayların", "birader-defteri": "Büyük Birader'in defteri",
 };
 const BELGE_SIRASI = Object.keys(BELGE_ADI);
 
@@ -27,7 +27,7 @@ export function belgeAdi(anahtar: string): string {
 }
 const sekmesi = (yol: string): Sekme | null =>
   yol.startsWith("belgeler/") ? "belgeler" : yol.startsWith("incelemeler/") ? "incelemeler"
-    : yol.startsWith("kod/kaynak/") ? "kaynak" : yol.startsWith("kod/") ? "kod" : null;
+    : yol.startsWith("cikti/") ? "cikti" : yol.startsWith("kod/kaynak/") ? "kaynak" : yol.startsWith("kod/") ? "kod" : null;
 const KAYNAK_LISTESI = 400;
 
 /** incelemeler/analiz-tur1-urun-sahibi-adim5.md -> parçalar */
@@ -48,7 +48,10 @@ interface Props {
 type Vurgu = { yol: string; ilk: number; son: number };
 
 export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli }: Props) {
-  const [sekme, setSekme] = useState<Sekme>(() => (secili && sekmesi(secili)) || "belgeler");
+  const projeli = Boolean(detay.fikir.proje);
+  // Mevcut projede kod/proje/ dosyaları Kod değil Proje sekmesindedir
+  const sekmeBul = (yol: string): Sekme | null => (projeli && yol.startsWith("kod/proje/") ? "proje" : sekmesi(yol));
+  const [sekme, setSekme] = useState<Sekme>(() => (secili && sekmeBul(secili)) || "belgeler");
   const [vurgu, setVurgu] = useState<Vurgu | null>(null);
   // Belgedeki kod atfına tıklanınca eski sistemin dosyası o satırlar vurgulanarak açılır
   const atifAc: AtifTiklama = (yol, ilk, son) => {
@@ -56,19 +59,25 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
     onSec(`kod/${yol}`);
   };
   useEffect(() => {
-    const s = secili ? sekmesi(secili) : null;
+    const s = secili ? sekmeBul(secili) : null;
     if (s) setSekme(s);
   }, [secili]);
 
   const asamaAdlari = useMemo(() => new Map(detay.asamalar.map((a) => [a.id, a.ad])), [detay.asamalar]);
   const adimlar = useMemo(() => new Map<number, Adim>(detay.adimlar.map((a) => [a.id, a])), [detay.adimlar]);
   const { belgeler, incelemeler, kod, kaynak } = detay.dosyalar;
+  const proje = detay.dosyalar.proje ?? [];
+  const cikti = detay.dosyalar.cikti ?? [];
+  // Proje sekmesi: yamadaki dosyalar önce (ne değişti), sonra projenin gerisi
+  const degisen = new Map((detay.yama?.dosyalar ?? []).map((d) => [`kod/proje/${d.yol}`, d.durum]));
+  const projeSirali = [...proje].sort((a, b) => Number(degisen.has(b.yol)) - Number(degisen.has(a.yol)) || a.yol.localeCompare(b.yol));
 
   const sekmeler: { id: Sekme; ad: string; sayi: number }[] = [
     { id: "belgeler", ad: "Belgeler", sayi: belgeler.length },
     { id: "incelemeler", ad: "İncelemeler", sayi: incelemeler.length },
-    { id: "kod", ad: "Kod", sayi: kod.length },
-    ...(kaynak.length ? [{ id: "kaynak" as Sekme, ad: "Mevcut sistem", sayi: kaynak.length }] : []),
+    ...(projeli ? [{ id: "proje" as Sekme, ad: "Proje", sayi: proje.length }] : [{ id: "kod" as Sekme, ad: "Kod", sayi: kod.length }]),
+    ...(kaynak.length ? [{ id: "kaynak" as Sekme, ad: projeli ? "Ekler" : "Mevcut sistem", sayi: kaynak.length }] : []),
+    ...(cikti.length ? [{ id: "cikti" as Sekme, ad: "Yama", sayi: cikti.length }] : []),
     ...(detay.kararlar.length ? [{ id: "kararlar" as Sekme, ad: "Kararlar", sayi: detay.kararlar.length }] : []),
     ...(detay.adrler.length ? [{ id: "adr" as Sekme, ad: "ADR", sayi: detay.adrler.length }] : []),
   ];
@@ -175,9 +184,45 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
                 })}
               </ul>
             ) : <p className="bos-not">Kod aşamaları başlayınca dosyalar burada görünür.</p>)}
+            {sekme === "proje" && (
+              <div className="dosya-grup">
+                <div className="dosya-grup-ad">Çalışma kopyası{degisen.size ? `; ${degisen.size} dosya değişti` : ""}</div>
+                <ul>
+                  {projeSirali.slice(0, KAYNAK_LISTESI).map((d) => {
+                    const rel = d.yol.replace(/^kod\/proje\//, "");
+                    const bol = rel.lastIndexOf("/");
+                    const durum = degisen.get(d.yol);
+                    return (
+                      <li key={d.yol}>
+                        <button type="button" className="dosya-oge dosya-oge--kod" aria-current={secili === d.yol} onClick={() => onSec(d.yol)}>
+                          {bol > 0 && <span className="dosya-klasor">{rel.slice(0, bol + 1)}</span>}
+                          <span>{rel.slice(bol + 1)}</span>
+                          {durum && <span className={`rozet rozet--${durum === "eklendi" ? "iyi" : "dikkat"}`}>{durum === "eklendi" ? "yeni" : "değişti"}</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {proje.length > KAYNAK_LISTESI && <p className="bos-not">+{proje.length - KAYNAK_LISTESI} dosya daha; dökümü Proje envanteri belgesinde.</p>}
+              </div>
+            )}
+            {sekme === "cikti" && (
+              <div className="dosya-grup">
+                <div className="dosya-grup-ad">Projene uygulayacağın çıktı</div>
+                <ul>
+                  {cikti.map((d) => (
+                    <li key={d.yol}>
+                      <button type="button" className="dosya-oge dosya-oge--kod" aria-current={secili === d.yol} onClick={() => onSec(d.yol)}>
+                        <span>{d.yol.replace(/^cikti\//, "")}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {sekme === "kaynak" && (
               <div className="dosya-grup">
-                <div className="dosya-grup-ad">Eski sistem, kilitli ve salt okunur</div>
+                <div className="dosya-grup-ad">{projeli ? "Verdiğin ekler, kilitli ve salt okunur" : "Eski sistem, kilitli ve salt okunur"}</div>
                 <ul>
                   {kaynak.slice(0, KAYNAK_LISTESI).map((d) => {
                     const rel = d.yol.replace(/^kod\/kaynak\//, "");
@@ -196,7 +241,7 @@ export function DosyaGorunumu({ fikirId, detay, secili, onSec, ajanAdlari, canli
               </div>
             )}
           </nav>
-          <DosyaIcerigi fikirId={fikirId} yol={secili} canli={canli} onAtif={detay.dosyalar.kaynak.length ? atifAc : undefined}
+          <DosyaIcerigi fikirId={fikirId} yol={secili} canli={canli} onAtif={detay.dosyalar.kaynak.length || projeli ? atifAc : undefined}
             vurgu={vurgu && vurgu.yol === secili ? vurgu : null} />
         </div>
       )}

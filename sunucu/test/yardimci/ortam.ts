@@ -118,6 +118,8 @@ export interface TestKovani extends Kovan {
  * motorlar: null verilirse motorlar ayarlardan kurulur (gerçek Claude, Ollama ya da OpenAI uyumlu motorlar).
  * dis_ayar: geliştiricinin kabuğundaki KOVAN_AYAR testlere sızmasın diye varsayılan null.
  * kasa: varsayılan null; işletim sisteminin anahtar kasası hiç okunmaz.
+ * Aşama sonu kapıları ve Büyük Birader varsayılan kapalı (katilim: sonda, buyuk_birader.acik: false): akış testleri
+ * bunlar olmadan yazıldı; kapı ve Büyük Birader kendi testlerinde açılır.
  */
 export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarlar>; motorlar?: Map<string, Motor> | null; gecikme?: number; dis_ayar?: string | null; kasa?: Kasa | null; klasorAcici?: (yol: string) => void; ajan_secimleri?: string | null; yolSecici?: (tur: "klasor" | "dosya") => Promise<string[] | null> } = {}): Promise<TestKovani> {
   const kok = secenek.kok ?? geciciKok();
@@ -127,7 +129,7 @@ export async function kovanOlustur(secenek: { kok?: string; ayar?: Partial<Ayarl
     ["qwen-yerel", new SahteMotor("qwen-yerel", true)],
   ]);
   const k = await kovanKur(kok, {
-    ayar: { calisma_dizini: path.join(kok, "calisma"), port: 8765, ...secenek.ayar },
+    ayar: { calisma_dizini: path.join(kok, "calisma"), port: 8765, katilim: "sonda", buyuk_birader: { acik: false, en_fazla_veto: 2 }, ...secenek.ayar },
     motorlar,
     arayuz: path.join(kok, "arayuz-yok"),
     dis_ayar: secenek.dis_ayar ?? null,

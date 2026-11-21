@@ -9,6 +9,7 @@ import { Simge } from "./Simge";
 function notYeri(secim: string): string {
   switch (secim) {
     case "geri_gonder": return "Ajan bu notu düzeltme isteği olarak görür.";
+    case "komut_degistir": return "ör. mvn -q test -pl hesap-modulu";
     case "bir_tur_daha": case "claude_devral": case "tekrar_dene": return "Ajan bir sonraki denemede bu notu görür.";
     case "durdur": return "Neden durdurduğunu yazabilirsin; kayda geçer.";
     default: return "Notun zaman çizelgesine kayda geçer.";
@@ -25,7 +26,8 @@ export function KararPaneli({ fikirId, bekleme, onBitti }: { fikirId: string; be
 
   const secili = bekleme.secenekler.find((s) => s.anahtar === secim);
   const geriGonder = secim === "geri_gonder";
-  const notZorunlu = geriGonder;
+  const komutDegistir = secim === "komut_degistir";
+  const notZorunlu = geriGonder || komutDegistir;
   const hazir = Boolean(secili) && !gonderiliyor && (!notZorunlu || not.trim().length > 0);
 
   const gonder = async () => {
@@ -76,7 +78,8 @@ export function KararPaneli({ fikirId, bekleme, onBitti }: { fikirId: string; be
       )}
 
       <label className="alan">
-        <span className="alan-ad">{notZorunlu ? "Ne değişsin?" : "Not"}{!notZorunlu && <span className="alan-ipucu"> isteğe bağlı</span>}</span>
+        <span className="alan-ad">{komutDegistir ? "Yeni test komutu" : notZorunlu ? "Ne değişsin?" : "Not"}{!notZorunlu && <span className="alan-ipucu"> isteğe bağlı</span>}
+          {komutDegistir && <span className="alan-ipucu"> proje kökünde koşar, tek satır</span>}</span>
         <textarea rows={notZorunlu ? 3 : 2} value={not} onChange={(e) => setNot(e.target.value)} disabled={gonderiliyor}
           placeholder={notYeri(secim)} />
       </label>
@@ -87,7 +90,7 @@ export function KararPaneli({ fikirId, bekleme, onBitti }: { fikirId: string; be
         <button type="button" className={`dugme ${secili?.tehlikeli ? "dugme--tehlikeli" : "dugme--birincil"}`} disabled={!hazir} onClick={gonder}>
           {gonderiliyor ? "Gönderiliyor..." : secili?.etiket ?? "Seç"}
         </button>
-        {notZorunlu && !not.trim() && <span className="alan-ipucu">Geri göndermek için ne istediğini yaz.</span>}
+        {notZorunlu && !not.trim() && <span className="alan-ipucu">{komutDegistir ? "Yeni komutu yaz." : "Geri göndermek için ne istediğini yaz."}</span>}
       </div>
     </section>
   );

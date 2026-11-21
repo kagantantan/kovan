@@ -1,0 +1,311 @@
+ad: Mevcut proje üzerinde iş
+aciklama: >
+  Var olan bir projede hata düzeltme, yeni özellik ya da entegrasyon. Projenin klasörünü, isteğini ve
+  varsa eklerini (sözleşme, hata detayı, test senaryosu) verirsin. Keşif projeyi okur ve iş önerisini
+  çıkarır; türü, boyutu ve dokunulacak alanı sen onaylarsın. Küçük işte önce kıran test, sonra düzeltme;
+  orta ve büyük işte fark analizi, teslim planı ve kalemler. Projene dokunulmaz; sonuç yama dosyasıdır.
+fikir_butcesi_usd: 12
+kaynak: proje              # fikir, projenin klasörüyle başlar (kod/proje/, çalışma kopyası); ekler kod/kaynak/ altında kilitli
+
+# Yer tutucular onaylanan öneri kartından dolar: {test_komutu}, {yazma_alani}, {test_alani}.
+# kosul: aşama yalnızca bu boyuttaki (kucuk, orta, buyuk) ve bu tarafı (be, fe) içeren işlerde koşar.
+
+asamalar:
+  - id: kesif
+    ad: Keşif
+    tur: kesif                # belge onaylanınca öneri kartı sana gelir: tür, boyut, test komutu, yazma alanı
+    ajan: mevcut-sistem-analisti
+    is_kurali_sana: true      # iş kuralı soruları ekibe uğramadan sana gelir
+    calisma_dizini: kod
+    salt_okunur: true
+    gorev: >
+      Bu bir keşif: isteği ve ekleri oku, projede işin geçtiği yeri bul. Bugünkü davranışı, isteğin neyi
+      değiştirdiğini, etkilenen dosyaları ve mevcut testleri proje/<dosya>:<satır> atıflarıyla yaz
+      (ekler için kaynak/<dosya>:<satır>). Hatada kök nedeni göster. Sonra iş önerisini çıkar: tür, boyut,
+      taraf başına yazma alanı ve yeni testlerin yeri. Belgenin sonuna kovan-is bloğunu ekle.
+    girdiler: [fikir, proje-envanteri, kaynak-envanteri]
+    cikti: kesif
+    dogrulama:
+      - ad: Kod atıfları
+        atif: true               # her atıf gerçek bir dosya ve satıra gitmeli; uydurma atıf geri döner
+      - ad: Etki alanı
+        inceleyen: mimar
+        odak: >
+          İşin geçtiği yer ve kök neden koda göre doğru mu? Yazma alanı işi yapmaya yetiyor mu, gereğinden
+          geniş mi? Boyut işe uygun mu (birkaç dosyalık iş küçük; yeni modül ya da mimari karar büyük)?
+      - ad: Test edilebilirlik
+        inceleyen: test-analisti
+        odak: >
+          İstek (hatada: hatanın yeniden üretilmesi) test yazılabilecek kesinlikte mi? Verilen test senaryoları
+          ve hata detayı eksiksiz kullanılmış mı? Test alanı projenin test düzenine uyuyor mu?
+    en_fazla_tur: 3
+
+  - id: baz-cizgisi
+    ad: Baz çizgisi
+    tur: kontrol              # ajan yok: projenin testleri işe başlamadan yeşil mi
+    dogrulama:
+      - ad: Projenin testleri
+        komut: "{test_komutu}"
+        dizin: proje
+        sure_dk: 20
+
+  - id: fark-analizi
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
+    ad: Fark analizi
+    kosul: { boyut: [orta, buyuk] }
+    ajan: analist
+    is_kurali_sana: true
+    gorev: >
+      İsteği bugünkü davranışa göre FARK olarak yaz; bütün sistemi yeniden anlatma. Değişen ve eklenen
+      kurallar (K1...): her biri için bugünkü davranış (keşifteki atıflarla), yeni davranış, uç durumlar ve
+      hata davranışı. Korunacak davranışları ayrıca listele. Kabul kriterleri ölçülebilir olsun.
+      Entegrasyonda sözleşmedeki alanları, hata kodlarını, zaman aşımı ve yeniden deneme davranışını yaz.
+    girdiler: [fikir, kesif, kaynak-envanteri]
+    cikti: analiz
+    dogrulama:
+      - ad: Mevcut davranış
+        inceleyen: mevcut-sistem-analisti
+        odak: Bugünkü davranış diye yazılanlar koda uyuyor mu? Değişiklik, korunacak denen bir davranışı bozuyor mu? Etkilenip de yazılmamış bir yer var mı?
+      - ad: Uygulanabilirlik
+        inceleyen: mimar
+        odak: Kurallar projenin mevcut yapısında uygulanabilir ve test edilebilir mi? Çelişkili kural var mı?
+      - ad: Uç durum ve kalite
+        inceleyen: test-analisti
+        odak: Her kural test edilebilir mi? Uç durumlar ve beklenen sonuçlar eksiksiz ve ölçülebilir mi?
+      - ad: Mevzuat
+        inceleyen: mevzuat
+        atlanabilir: true
+        odak: Kişisel veri, rıza, saklama ya da finansal bilgilendirme açısından eksik bir gereksinim var mı?
+    en_fazla_tur: 3
+
+  - id: ux-tasarim
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
+    ad: UX tasarım
+    kosul: { boyut: [buyuk], taraf: [fe] }
+    ajan: ux-tasarimci
+    calisma_dizini: kod
+    gorev: >
+      Değişen ve eklenen ekranları, durumları ve arayüz sözleşmesini tasarla; projenin mevcut arayüz diline
+      uy. Tıklanabilir prototipi tasarim/ altına yaz (projenin dışında; yamaya girmez).
+    girdiler: [fikir, kesif, analiz]
+    cikti: ux-ozeti
+    yazabilir: [tasarim]
+    kilitle: [tasarim]
+    dogrulama:
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Analizdeki her hata durumu ve uç durum bir ekran durumu olarak tasarlanmış mı? Mevcut ekranlarla tutarlı mı?
+    en_fazla_tur: 2
+
+  - id: teknik-plan
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
+    once_soru: true           # Mimar planı yazmadan önce en çok şeyi değiştiren mimari seçimleri sana getirir
+    ad: Teknik plan
+    kosul: { boyut: [buyuk] }
+    ajan: mimar
+    gorev: >
+      Fark analizini projenin MEVCUT mimarisine oturan en sade teknik plana çevir: hangi modül, sınıf ve
+      arayüz değişir ya da eklenir; mevcut katmanlara ve adlandırmaya uy, yeni çatı getirme. Entegrasyonda
+      dış bağlantıyı bir port arkasına al. Önemli kararları ADR olarak yaz.
+    girdiler: [fikir, kesif, analiz, ux-ozeti]
+    cikti: teknik-plan
+    dogrulama:
+      - ad: ADR biçimi
+        adr: { en_az: 1 }
+      - ad: Analist onayı
+        inceleyen: analist
+        odak: Plan fark analizindeki tüm kuralları ve uç durumları karşılıyor mu? Analizde olmayan bir şey eklenmiş mi?
+      - ad: Mevcut yapıya uyum
+        inceleyen: mevcut-sistem-analisti
+        odak: Plan projenin bugünkü yapısıyla, katmanlarıyla ve adlandırmasıyla uyumlu mu? Var olan bir parçayı gereksiz yere yeniden mi yazıyor?
+      - ad: Güvenlik onayı
+        inceleyen: guvenlik
+        odak: Girdi doğrulama, gizli bilgi (bağlantı bilgileri yalnızca yapılandırmadan), kişisel veri ve loglama kararları yeterli mi?
+    en_fazla_tur: 2
+
+  - id: teslim-plani
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
+    ad: Teslim planı
+    kosul: { boyut: [orta, buyuk] }
+    ajan: proje-yoneticisi
+    gorev: >
+      Fark analizini (varsa teknik planı) 2-5 sıralı iş kalemine böl (P1, P2...): her kalem tek başına test
+      edilebilir küçük bir değişiklik olsun. Yazılımcı, işin taraflarına göre be-yazilimci ya da fe-yazilimci.
+      Belgenin sonuna kovan-plan bloğunu ekle.
+    girdiler: [fikir, kesif, analiz, ux-ozeti, teknik-plan]
+    cikti: teslim-plani
+    dogrulama:
+      - ad: Plan biçimi
+        plan: true
+      - ad: Kapsam
+        inceleyen: analist
+        odak: Fark analizindeki her kural bir kaleme düşüyor mu? Analizde olmayan bir kalem var mı?
+      - ad: Teknik sıra
+        inceleyen: mimar
+        odak: Bağımlılıklar doğru mu, her kalem tek başına test edilebilir mi, sıra mevcut testleri kırmadan ilerliyor mu?
+    en_fazla_tur: 2
+
+  - id: kalemler
+    ad: İş kalemleri
+    kosul: { boyut: [orta, buyuk] }
+    tur: kalemler
+    plan: teslim-plani
+    geri_donus: teslim-plani
+    gelistiriciler:
+      be-yazilimci: { taraf: be }
+      fe-yazilimci: { taraf: fe }
+    adimlar:
+      - id: kabul-testi
+        ad: Kabul testi
+        ajan: test-otomasyon
+        calisma_dizini: kod
+        gorev: >
+          {kalem} ({baslik}) için kabul testlerini projenin kendi test çatısıyla yaz: {kapsam} Testler
+          bugünkü kodda doğru sebeple BAŞARISIZ olmalı. Yalnızca bu kalemin test klasörüne yaz; uygulama
+          kodunu değiştirme.
+        girdiler: [kesif, analiz, teknik-plan, teslim-plani, kaynak-envanteri]
+        cikti: "{kalem_kucuk}-kabul-testi"
+        yazabilir: ["{test_alani}/{kalem_kucuk}"]
+        kilitle: ["{test_alani}/{kalem_kucuk}"]
+        dogrulama:
+          - ad: Önce kırmızı
+            komut: "{test_komutu}"
+            dizin: proje
+            beklenen: kirmizi       # yeni testler koddan önce başarısız olmalı; yeşilse test isteneni yakalamıyor
+            sure_dk: 20
+          - ad: Senaryo incelemesi
+            inceleyen: analist
+            odak: "{kalem} testleri bu kalemin kurallarını ve uç durumlarını fark analizindeki gibi sınıyor mu?"
+          - ad: Test incelemesi
+            inceleyen: test-analisti
+            odak: "{kalem} testleri doğru sebeple mi kırmızı? Zayıf ya da her koşulda geçecek test var mı? Projenin test çatısına ve adlandırmasına uyuyor mu?"
+        en_fazla_tur: 3
+
+      - id: is-kalemi
+        ad: İş kalemi
+        ajan: "{gelistirici}"
+        calisma_dizini: kod
+        gorev: >
+          {kalem} kalemini yaz: {kapsam} Projenin mevcut yapısına ve stiline uy; değişiklik en küçük olsun.
+          Bu kalemin ve önceki kalemlerin kilitli testleri ile projenin mevcut testleri yeşil olmalı.
+        girdiler: [kesif, analiz, teknik-plan, teslim-plani, "{kalem_kucuk}-kabul-testi"]
+        cikti: "{kalem_kucuk}-is-notu"
+        yazabilir: ["{yazma_alani}"]
+        dogrulama:
+          - ad: Bütün testler
+            komut: "{test_komutu}"
+            dizin: proje
+            sure_dk: 20
+          - ad: Uygunluk
+            inceleyen: analist
+            odak: Kod {kalem} kalemine ait kuralları ve hata davranışını fark analizine uygun karşılıyor mu?
+          - ad: Kod incelemesi
+            inceleyen: mimar
+            odak: Değişiklik projenin yapısına ve stiline uyuyor mu, sade ve doğru mu? İlgisiz kod değişmiş mi? Teste özel dal ya da hard-code var mı?
+          - ad: Mevcut davranış
+            inceleyen: mevcut-sistem-analisti
+            odak: Değişiklik, korunması gereken mevcut bir davranışı bozuyor mu? Bu kodu çağıran başka yerler etkileniyor mu?
+          - ad: Güvenlik incelemesi
+            inceleyen: guvenlik
+            odak: Değişiklikte KRİTİK ya da YÜKSEK seviyede güvenlik açığı var mı? Koda yazılmış bağlantı bilgisi ya da sır var mı?
+        en_fazla_tur: 4
+
+  - id: kiran-test
+    ad: Kıran test
+    kosul: { boyut: [kucuk] }
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: >
+      Keşifteki isteği (hatada: hatanın kendisini) yakalayan testi projenin kendi test çatısıyla yaz:
+      bugünkü kodda doğru sebeple BAŞARISIZ, düzeltmeden sonra başarılı olmalı. Eklerde test senaryosu
+      verildiyse her birini bir teste çevir. Mevcut bir test yanlış davranışı doğruluyorsa onu güncelle ve
+      özetinde belirt. Yalnızca test alanına yaz; uygulama kodunu değiştirme.
+    girdiler: [fikir, kesif, kaynak-envanteri]
+    cikti: kiran-test
+    yazabilir: ["{test_alani}"]
+    kilitle: ["{test_alani}"]
+    dogrulama:
+      - ad: Önce kırmızı
+        komut: "{test_komutu}"
+        dizin: proje
+        beklenen: kirmizi           # test bugünkü kodda başarısız olmalı; yeşilse isteneni yakalamıyor
+        sure_dk: 20
+      - ad: Test incelemesi
+        inceleyen: test-analisti
+        odak: >
+          Test isteği (hatada: hatayı) gerçekten yakalıyor mu ve doğru sebeple mi kırmızı? Zayıf ya da her koşulda
+          geçecek test var mı? Verilen test senaryolarının hepsi karşılanmış mı?
+    en_fazla_tur: 3
+
+  - id: duzeltme
+    ad: Düzeltme
+    kosul: { boyut: [kucuk] }
+    ajan: "{gelistirici}"         # işin tarafına göre: be -> be-yazilimci, fe -> fe-yazilimci
+    gelistiriciler:
+      be-yazilimci: { taraf: be }
+      fe-yazilimci: { taraf: fe }
+    calisma_dizini: kod
+    gorev: >
+      Keşifteki işi yap: kilitli yeni testleri ve projenin mevcut testlerini geçen en küçük değişiklik.
+      Projenin yapısına ve stiline uy; ilgisiz kodu yeniden yazma ya da biçimlendirme.
+    girdiler: [fikir, kesif, kiran-test]
+    cikti: duzeltme-notu
+    yazabilir: ["{yazma_alani}"]
+    dogrulama:
+      - ad: Bütün testler
+        komut: "{test_komutu}"
+        dizin: proje
+        sure_dk: 20
+      - ad: Kod incelemesi
+        inceleyen: mimar
+        odak: Değişiklik kök nedeni mi çözüyor, belirtiyi mi maskeliyor? Projenin yapısına ve stiline uyuyor mu? Teste özel dal ya da hard-code var mı?
+      - ad: Mevcut davranış
+        inceleyen: mevcut-sistem-analisti
+        odak: Değişiklik, korunması gereken mevcut bir davranışı bozuyor mu? Bu kodu çağıran başka yerler etkileniyor mu?
+      - ad: Güvenlik incelemesi
+        inceleyen: guvenlik
+        odak: Değişiklikte KRİTİK ya da YÜKSEK seviyede güvenlik açığı var mı? Koda yazılmış bağlantı bilgisi ya da sır var mı?
+    en_fazla_tur: 4
+
+  - id: birlestirme
+    ad: Birleştirme
+    kosul: { boyut: [orta, buyuk] }
+    ajan: test-otomasyon
+    calisma_dizini: kod
+    gorev: >
+      Kalemleri uçtan uca bağlayan senaryoları test alanındaki entegrasyon klasörüne yaz ve projenin bütün
+      testlerini birlikte koş. Uygulama hatası bulursan düzeltme; "UYGULAMA HATASI:" diye ilgili kalemle yaz.
+    girdiler: [kesif, analiz, teslim-plani, kalemler]
+    cikti: birlestirme
+    yazabilir: ["{test_alani}/entegrasyon"]
+    kilitle: ["{test_alani}/entegrasyon"]
+    dogrulama:
+      - ad: Bütün testler
+        komut: "{test_komutu}"
+        dizin: proje
+        sure_dk: 20
+      - ad: Birleştirme onayı
+        inceleyen: mimar
+        odak: Kalemler birlikte plandaki gibi çalışıyor mu? Kalemler arasında çelişen ya da tekrar eden kod var mı?
+    en_fazla_tur: 2
+
+  - id: degisiklik-notu
+    ad: Değişiklik notu
+    ajan: proje-yoneticisi
+    gorev: >
+      Değişiklik notunu yaz; projeyi teslim alacak ekip okuyacak. Ne istendi; ne değişti (dosya dosya, neden);
+      nasıl test edildi (yeni testler, projenin test sonucu); alınan kararlar; projeye alınırken yapılacaklar
+      (yapılandırma ve ortam değişkenleri, veri ya da şema değişikliği, entegrasyonda gerçek bağlantının
+      denenmesi); geri alma; bilinen sınırlar ve açık riskler. Girdilerde olmayan bir başarı iddiası yazma.
+    girdiler: [fikir, kesif, analiz, teknik-plan, teslim-plani, kalemler, kiran-test, duzeltme-notu, birlestirme, kararlar]
+    cikti: degisiklik-notu
+    dogrulama:
+      - ad: Doğruluk
+        inceleyen: mevcut-sistem-analisti
+        odak: Not, koddaki değişikliği doğru ve eksiksiz anlatıyor mu? Girdilerde ya da kodda karşılığı olmayan bir iddia var mı?
+    en_fazla_tur: 2
+
+  - id: kabul
+    ad: Kabul
+    tur: insan
+    soru: Değişiklik, testler ve değişiklik notu hazır. Yamayı (cikti/degisiklik.patch) ve notu incele; kabul et ya da notunla geri gönder.

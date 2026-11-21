@@ -90,6 +90,8 @@ export function adimDurumu(a: Adim): { ad: string; ton: Ton } {
     case "bekliyor": return { ad: "seni bekliyor", ton: "dikkat" };
     case "karar": return { ad: "karar verildi", ton: "sessiz" };
     case "atlandi": return { ad: "atlandı", ton: "sessiz" };
+    case "atlandi-denetim": return { ad: "denetim atlandı", ton: "sessiz" };
+    case "veto": return { ad: "veto etti", ton: "kotu" };
     case "durduruldu": return { ad: "durduruldu", ton: "sessiz" };
     case "kesildi": return { ad: "yarıda kaldı", ton: "kotu" };
     case "yeniden": return { ad: "yeniden doğrulama", ton: "sessiz" };
@@ -114,3 +116,18 @@ export function onerilenAyir(etiket: string): { metin: string; onerilen: boolean
   const m = /\s*\((önerilen|onerilen|recommended)\)\s*$/i.exec(etiket);
   return m ? { metin: etiket.slice(0, m.index).trim(), onerilen: true } : { metin: etiket, onerilen: false };
 }
+
+/** Mevcut proje üzerinde iş: öneri kartındaki tür ve boyut. */
+export const IS_TURU: Record<string, string> = { hata: "Hata düzeltme", ozellik: "Yeni özellik", entegrasyon: "Entegrasyon" };
+export const IS_BOYUTU: Record<string, string> = { kucuk: "küçük", orta: "orta", buyuk: "büyük" };
+
+/** Aşama sonu kapıları: fikir başına seçilir, sonradan değiştirilebilir. */
+export const KATILIM_ADI: Record<string, string> = { planlama: "Planlama aşamalarında", her_asama: "Her aşamada", sonda: "Yalnızca sonda" };
+export const KATILIM_ACIKLAMA: Record<string, string> = {
+  planlama: "Kapsam, analiz, tasarım, teknik plan ve teslim planı bitince alınan kararlar madde madde sana gelir; onaylamadan ilerlenmez. Kod aşamaları kendi akar.",
+  her_asama: "Kod ve test aşamaları dahil her aşamanın sonunda kararlar sana gelir. En çok söz, en çok bekleme.",
+  sonda: "Aşamalar kendi akar; yalnızca ajanların soruları ve en sondaki kabul sana gelir.",
+};
+/** Büyük Birader'in hükmü ve arayüzdeki tonu. */
+export const HUKUM_ADI: Record<string, string> = { UYGUN: "Uygun", DIKKAT: "Dikkat", VETO: "Veto" };
+export const HUKUM_TONU: Record<string, string> = { UYGUN: "uygun", DIKKAT: "dikkat", VETO: "veto" };

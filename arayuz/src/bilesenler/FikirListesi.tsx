@@ -1,7 +1,7 @@
 // Sol ray: fikirler. Kararını bekleyenler en üstte, sonra çalışanlar, sonra diğerleri.
 import type { FikirOzeti } from "../api";
 import { para } from "../bicim";
-import { Altigen } from "./Simge";
+import { Altigen, Simge } from "./Simge";
 
 const SIRA: Record<string, number> = { bekliyor: 0, calisiyor: 1, sirada: 1, durduruldu: 2, tamamlandi: 3 };
 const TON: Record<string, string> = { bekliyor: "dikkat", calisiyor: "calisan", sirada: "calisan", durduruldu: "bos", tamamlandi: "iyi" };
@@ -36,7 +36,10 @@ export function FikirListesi({ fikirler, seciliId }: { fikirler: FikirOzeti[]; s
             <span className="fikir-satiri-govde">
               <span className="fikir-satiri-baslik">{f.baslik}</span>
               <span className="fikir-satiri-durum">
-                <span>{durumCumlesi(f)}</span>
+                <span>{durumCumlesi(f)}{(f.birader === "VETO" || f.birader === "DIKKAT") && (
+                  <span className={`fikir-satiri-goz fikir-satiri-goz--${f.birader === "VETO" ? "veto" : "dikkat"}`}
+                    title={f.birader === "VETO" ? "Büyük Birader son aşamayı veto etti" : "Büyük Birader'in bir uyarısı var"}><Simge ad="goz" boyut={13} /></span>
+                )}</span>
                 <span className="fikir-satiri-para">{para(f.maliyet_usd)}</span>
               </span>
             </span>

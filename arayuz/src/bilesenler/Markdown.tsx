@@ -1,5 +1,5 @@
 // Ajanların yazdığı markdown'ı güvenli biçimde gösterir: marked ile HTML'e, DOMPurify ile temizlenir.
-// onAtif verilirse belgedeki kod atıfları (kaynak/<dosya>:<satır>) tıklanır: eski sistemin o satırları açılır.
+// onAtif verilirse belgedeki kod atıfları (kaynak/<dosya>:<satır>, mevcut projede proje/<dosya>:<satır>) tıklanır: o satırlar açılır.
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useEffect, useMemo, useRef } from "react";
@@ -14,7 +14,7 @@ DOMPurify.addHook("afterSanitizeAttributes", (dugum) => {
 });
 
 /** Sunucudaki atıf denetimiyle aynı biçim (sunucu/src/kaynak.ts). */
-const ATIF = /(?<![\w/])(kaynak\/[^\s`'"()[\]<>|,;]+?):(\d+)(?:-(\d+))?(?!\d)/g;
+const ATIF = /(?<![\w/])((?:kaynak|proje)\/[^\s`'"()[\]<>|,;]+?):(\d+)(?:-(\d+))?(?!\d)/g;
 
 export type AtifTiklama = (yol: string, ilk: number, son: number) => void;
 
@@ -24,7 +24,7 @@ function atiflariBagla(kok: HTMLElement): void {
   const dugumler: Text[] = [];
   for (let n = yuruyen.nextNode(); n; n = yuruyen.nextNode()) {
     if (n.parentElement?.closest("a, button")) continue;
-    if ((n.nodeValue ?? "").includes("kaynak/")) dugumler.push(n as Text);
+    if (/(?:kaynak|proje)\//.test(n.nodeValue ?? "")) dugumler.push(n as Text);
   }
   for (const dugum of dugumler) {
     const metin = dugum.nodeValue ?? "";
@@ -38,7 +38,7 @@ function atiflariBagla(kok: HTMLElement): void {
       d.type = "button";
       d.className = "atif";
       d.textContent = m[0];
-      d.title = "Eski sistemde bu satırları aç";
+      d.title = "Bu satırları aç";
       d.dataset.atif = m[1];
       d.dataset.ilk = m[2];
       d.dataset.son = m[3] ?? m[2];

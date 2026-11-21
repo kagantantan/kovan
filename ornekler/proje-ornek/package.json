@@ -1,0 +1,10 @@
+{
+  "name": "taksit-hesap",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Uydurma örnek proje: taksit planı hesabı. Kovan'ın 'Mevcut proje üzerinde iş' akışını denemek için.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

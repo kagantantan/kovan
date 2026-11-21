@@ -17,7 +17,7 @@ import { bekle, kisalt } from "./ortak.js";
 export interface AjanCagrisi {
   rol: string;
   asama_id: string;
-  gorev_turu: "uret" | "inceleme" | "karar";   // karar: ortak kararda oy
+  gorev_turu: "uret" | "inceleme" | "karar" | "sohbet";   // karar: ortak kararda oy; sohbet: projenin sahibinin sorusuna cevap (salt okunur)
   sistem: string;
   istem: string;
   model: string;
@@ -107,6 +107,26 @@ export const KARAR_SEMASI = {
   additionalProperties: false,
 };
 
+/** Büyük Birader'in hükmü: her aşamanın sonunda işin tamamına bakar. VETO kanıt ister. */
+export const BIRADER_SEMASI = {
+  type: "object",
+  properties: {
+    hukum: { type: "string", enum: ["UYGUN", "DIKKAT", "VETO"] },
+    ozet: { type: "string" },
+    bulgular: {
+      type: "array", maxItems: 6,
+      items: {
+        type: "object",
+        properties: { konu: { type: "string" }, kanit: { type: "string" }, aciklama: { type: "string" } },
+        required: ["konu", "kanit", "aciklama"], additionalProperties: false,
+      },
+    },
+    oneri: { type: "string" },
+  },
+  required: ["hukum", "ozet", "bulgular"],
+  additionalProperties: false,
+};
+
 /** Ortak kararda bir ajanın oyları: her soru için seçenek numaraları (1'den başlar). */
 export const OY_SEMASI = {
   type: "object",
@@ -132,7 +152,9 @@ export const OY_SEMASI = {
 
 /** Model --json-schema'yı desteklemiyorsa (yerel motor) JSON istemin sonunda istenir. */
 export function yedekJsonTalimati(c: AjanCagrisi): string {
-  const ornek = c.gorev_turu === "karar"
+  const ornek = c.sema === BIRADER_SEMASI
+    ? '{"hukum": "UYGUN" | "DIKKAT" | "VETO", "ozet": "...", "bulgular": [{"konu": "...", "kanit": "...", "aciklama": "..."}], "oneri": "..."}'
+    : c.gorev_turu === "karar"
     ? '{"oylar": [{"soru": 1, "secim": [1], "insana_birak": false, "gerekce": "..."}]}'
     : '{"karar": "ONAY" | "DUZELT" | "SORU", "gerekce": "...", "bulgular": ["..."], "sorular": []}';
   return `\n\nYanıtının EN SONUNA yalnızca şu biçimde bir JSON bloğu koy:\n\`\`\`json\n${ornek}\n\`\`\``;
@@ -1061,6 +1083,154 @@ const DENEME_REESKONT_GELISIM = [
   "```",
 ].join("\n");
 
+// ------------------------------ deneme: mevcut proje üzerinde iş ------------------------------
+// Sahte motor yalnızca Kovan'ın örnek projesinde (ornekler/proje-ornek) gerçek bir değişiklik yapar: kalan kuruş hatası.
+const DENEME_PROJE_DOSYA = "proje/src/taksit.mjs";
+const DENEME_PROJE_HATALI = "  return Array.from({ length: adet }, () => taksit);";
+const DENEME_PROJE_DUZELTME = "  const kalan = toplamKurus - taksit * adet;   // bölümden kalan kuruş son taksite eklenir; toplam tutar korunur\n" +
+  "  return Array.from({ length: adet }, (_, i) => (i === adet - 1 ? taksit + kalan : taksit));";
+const DENEME_PROJE_OZET = `// Taksit özeti: planın kısa dökümü.
+import { taksitPlani } from "./taksit.mjs";
+
+/**
+ * @param {number} toplamKurus toplam tutar, kuruş
+ * @param {number} adet taksit sayısı
+ */
+export function taksitOzeti(toplamKurus, adet) {
+  const plan = taksitPlani(toplamKurus, adet);
+  return { adet, taksit: plan[0], sonTaksit: plan[plan.length - 1], toplam: plan.reduce((a, b) => a + b, 0) };
+}
+`;
+const denemeProjeTesti = (src: string, tur: "kalan" | "ozet" | "akis") => `import assert from "node:assert/strict";
+import { test } from "node:test";
+` + (tur === "kalan" ? `import { taksitPlani } from "${src}/taksit.mjs";
+
+test("TS-1: taksitlerin toplamı tutara eşittir (kalan kuruş kaybolmaz)", () => {
+  const plan = taksitPlani(10000, 3);
+  assert.equal(plan.reduce((a, b) => a + b, 0), 10000);
+});
+
+test("TS-2: kalan kuruş son taksite eklenir", () => {
+  assert.deepEqual(taksitPlani(10000, 3), [3333, 3333, 3334]);
+});
+` : tur === "ozet" ? `import { taksitOzeti } from "${src}/ozet.mjs";
+
+test("TS-3: özet taksit sayısını, tutarları ve toplamı verir", () => {
+  assert.deepEqual(taksitOzeti(10000, 3), { adet: 3, taksit: 3333, sonTaksit: 3334, toplam: 10000 });
+});
+` : `import { taksitOzeti } from "${src}/ozet.mjs";
+import { taksitPlani } from "${src}/taksit.mjs";
+
+test("TS-E2E-1: plan ile özet aynı toplamı verir", () => {
+  for (const [tutar, adet] of [[10000, 3], [9999, 7], [12345, 12]]) {
+    assert.equal(taksitPlani(tutar, adet).reduce((a, b) => a + b, 0), tutar);
+    assert.equal(taksitOzeti(tutar, adet).toplam, tutar);
+  }
+});
+`);
+const DENEME_PROJE_PLAN = `# Teslim planı (deneme)
+
+> Bu belgeyi sahte motor üretti; gerçek bir ajan çalışmadı.
+
+| Kalem | Ne | Yazılımcı |
+|---|---|---|
+| P1 | Kalan kuruş son taksite | BE |
+| P2 | Taksit özeti | BE |
+
+\`\`\`kovan-plan
+kalemler:
+  - id: P1
+    baslik: Kalan kuruş son taksite
+    gelistirici: be-yazilimci
+    bagimli: []
+    kabul: [K1]
+    kapsam: Tutar taksit sayısına tam bölünmediğinde kalan kuruş son taksite eklenir; taksitlerin toplamı tutara eşit olur.
+  - id: P2
+    baslik: Taksit özeti
+    gelistirici: be-yazilimci
+    bagimli: [P1]
+    kabul: [K2]
+    kapsam: taksitOzeti(toplam, adet) taksit sayısını, taksit tutarını, son taksiti ve toplamı döndürür.
+\`\`\`
+`;
+
+/** kok altındaki ilk metin dosyası (göreli); gizli ve bağımlılık klasörlerine girmez. */
+function denemeIlkDosya(kok: string, onek: string): string | null {
+  if (!fs.existsSync(kok)) return null;
+  for (const g of fs.readdirSync(kok, { withFileTypes: true }).sort((a, b) => Number(a.isDirectory()) - Number(b.isDirectory()) || a.name.localeCompare(b.name))) {
+    if (g.name.startsWith(".") || g.name === "node_modules") continue;
+    if (g.isFile() && fs.statSync(path.join(kok, g.name)).size > 0) return `${onek}/${g.name}`;
+    if (g.isDirectory()) { const alt = denemeIlkDosya(path.join(kok, g.name), `${onek}/${g.name}`); if (alt) return alt; }
+  }
+  return null;
+}
+
+function denemeKesif(kod: string, fikir: string): string {
+  const ornek = fs.existsSync(path.join(kod, DENEME_PROJE_DOSYA));
+  const [tur, boyut] = /entegrasyon|entegre/i.test(fikir) ? ["entegrasyon", "buyuk"] : /özellik|özet/i.test(fikir) ? ["ozellik", "orta"] : ["hata", "kucuk"];
+  const ek = denemeIlkDosya(path.join(kod, "kaynak"), "kaynak");
+  const ekSatiri = ek ? [`- Ek: verilen belge okundu (${ek}:1).`] : [];
+  const blok = (yazma: string, test: string, gerekce: string) => ["## İş önerisi", "```kovan-is", `tur: ${tur}`, `boyut: ${boyut}`, `gerekce: ${gerekce}`,
+    "taraflar:", "  be:", `    yazma_alani: [${yazma}]`, `    test_alani: ${test}`, "```"];
+  if (!ornek) {
+    const ilk = denemeIlkDosya(path.join(kod, "proje"), "proje") ?? "proje/README.md";
+    return ["# Keşif (deneme)", "", "> Bu belgeyi sahte motor üretti; gerçek bir ajan çalışmadı. Sahte motor yalnızca Kovan'ın örnek projesinde (ornekler/proje-ornek) gerçek bir değişiklik yapar.", "",
+      "## İstek", kisalt(fikir.trim(), 300) || "-", "", "## İşin geçtiği yer", `- Projede ilk bakılan dosya (${ilk}:1).`, ...ekSatiri, "",
+      ...blok(ilk, "proje/kovan-deneme-test", "Deneme modu: proje tanınmadı; öneri yalnızca akışı göstermek için.")].join("\n");
+  }
+  const satirlar = fs.readFileSync(path.join(kod, DENEME_PROJE_DOSYA), "utf8").split("\n");
+  const n = Math.max(1, satirlar.findIndex((x) => x.includes("Math.floor")) + 1);
+  return ["# Keşif (deneme)", "", "> Bu belgeyi sahte motor üretti; gerçek bir ajan çalışmadı.", "",
+    "## İstek", kisalt(fikir.trim(), 300) || "-", "",
+    "## İşin geçtiği yer", `- \`taksitPlani\` tutarı taksit sayısına böler ve aşağı yuvarlar (${DENEME_PROJE_DOSYA}:${n}); bütün taksitler aynı tutarla döner (${DENEME_PROJE_DOSYA}:${n + 1}).`, ...ekSatiri, "",
+    "## Kök neden", "Bölümden kalan kuruş hiçbir taksite eklenmiyor: 100,00 TL 3 taksitte 33,33 + 33,33 + 33,33 = 99,99 TL ediyor.", "",
+    "## Etki", `- Değişecek: ${DENEME_PROJE_DOSYA}`, "- Mevcut testler yalnızca tam bölünen tutarları sınıyor (proje/test/taksit.test.mjs:6); kalanlı bölme sınanmıyor.", "",
+    "## Korunacak davranışlar", "- Tam bölünen tutarlarda sonuç değişmez; geçersiz tutar ve taksit sayısı reddedilir.", "",
+    ...blok("proje/src", "proje/test/kovan", "Tek fonksiyonda kalan kuruş kaybı; bir kaynak dosyası etkileniyor, mevcut testler korunuyor.")].join("\n");
+}
+
+/** Mevcut proje akışında sahte motorun üretimi. null: genel deneme belgesine düş. */
+function denemeProje(c: AjanCagrisi, ilkTur: boolean): string | null {
+  if (c.rol === "proje-yoneticisi" && c.asama_id === "teslim-plani") return DENEME_PROJE_PLAN;
+  const kod = c.cwd;
+  if (path.basename(kod) !== "kod") return null;
+  if (c.asama_id === "kesif") return denemeKesif(kod, /### fikir\n([\s\S]*?)(?=\n### |\n## |$)/.exec(c.istem)?.[1] ?? "");
+  if (!["test-otomasyon", "be-yazilimci", "fe-yazilimci"].includes(c.rol)) return null;
+  if (!fs.existsSync(path.join(kod, DENEME_PROJE_DOSYA))) return "Deneme modu: bu proje Kovan'ın örnek projesi değil; sahte motor gerçek bir değişiklik yapamaz.";
+  const yaz = (rel: string, metin: string) => {
+    fs.mkdirSync(path.dirname(path.join(kod, rel)), { recursive: true });
+    fs.writeFileSync(path.join(kod, rel), metin, "utf8");
+  };
+  const kalem = /^(p\d+)-/.exec(c.asama_id)?.[1] ?? null;
+  if (c.rol === "test-otomasyon") {
+    const alan = /YAZMA ALANIN[^\n]*?`([^`]+)`/.exec(c.istem)?.[1].replace(/\/$/, "") ?? "proje/test/kovan";
+    const src = path.posix.relative(alan, "proje/src");
+    const [dosya, tur] = c.asama_id === "birlestirme" ? ["akis.test.mjs", "akis"] as const : kalem === "p2" ? ["ozet.test.mjs", "ozet"] as const : ["kalan-kurus.test.mjs", "kalan"] as const;
+    yaz(`${alan}/${dosya}`, denemeProjeTesti(src, tur));
+    return c.asama_id === "birlestirme" ? `Deneme modu: uçtan uca senaryo (TS-E2E-1) ${alan}/${dosya} dosyasına eklendi; projenin bütün testleri birlikte koşuyor.`
+      : `Deneme modu: ${alan}/${dosya} yazıldı. Bugünkü kodda kırmızı: beklenen davranış henüz yok.`;
+  }
+  if (process.env.KOVAN_DENEME_IHLAL && ilkTur) {
+    // Sınır denemesi: yazma alanı dışındaki proje dosyasına ve kilitli teste dokunur; sistem geri almalı
+    fs.appendFileSync(path.join(kod, "proje/README.md"), "\nalan dışı değişiklik\n");
+    const kilitli = path.join(kod, "proje/test/kovan/kalan-kurus.test.mjs");
+    if (fs.existsSync(kilitli)) fs.appendFileSync(kilitli, "\n// testi gevşettim\n");
+  }
+  if (kalem === "p2") { yaz("proje/src/ozet.mjs", DENEME_PROJE_OZET); return "Deneme modu: proje/src/ozet.mjs eklendi; testler yeşil."; }
+  const kaynak = fs.readFileSync(path.join(kod, DENEME_PROJE_DOSYA), "utf8");
+  if (kaynak.includes(DENEME_PROJE_HATALI)) yaz(DENEME_PROJE_DOSYA, kaynak.replace(DENEME_PROJE_HATALI, DENEME_PROJE_DUZELTME));
+  return `Deneme modu: ${DENEME_PROJE_DOSYA} düzeltildi: bölümden kalan kuruş son taksite ekleniyor. Yeni testler ve projenin mevcut testleri yeşil.`;
+}
+
+/** Deneme belgelerinin sonuna eklenen karar özeti: kapı kartını ve Büyük Birader'in izlemesini göstermek için. */
+function denemeOzeti(asamaId: string): string {
+  return ["", "", "```kovan-ozet", "kararlar:",
+    `  - baslik: ${asamaId} ana kararı`, "    karar: Bu aşama, girdilerdeki isteği en sade yoldan karşılayacak biçimde karara bağlandı (deneme).",
+    "    neden: Deneme modu; gerçek bir ajan çalışmadı.", "    alternatif: Daha kapsamlı bir çözüm; ilk sürüm için gereksiz.", "    tur: karar",
+    "  - baslik: Varsayılan kapsam", "    karar: Girdilerde yazmayan konular kapsam dışı sayıldı.", "    neden: Belirsiz konuda en dar yorum seçildi.", "    tur: varsayim",
+    "```"].join("\n");
+}
+
 export class DenemeMotoru implements Motor {
   readonly ad = "deneme";
   readonly tur = "deneme" as const;
@@ -1084,7 +1254,15 @@ export class DenemeMotoru implements Motor {
     let yapisal: Record<string, unknown> | null = null;
     if (c.gorev_turu === "inceleme") { yapisal = this.incele(c); metin = JSON.stringify(yapisal); }
     else if (c.gorev_turu === "karar") { yapisal = DenemeMotoru.oyla(c); metin = JSON.stringify(yapisal); }
-    else metin = this.uret(c);
+    else if (c.gorev_turu === "sohbet") {
+      const soru = /^# Soru \(projenin sahibinden\)\n\n([\s\S]*?)(?=\n## |$)/.exec(c.istem)?.[1].trim() ?? "";
+      metin = `Deneme modu: sorunu aldım ("${kisalt(soru, 120)}"). Gerçek bir ajan çalışmadığı için yalnızca akışı gösteriyorum.\n\n` +
+        "- Belgedeki karar girdilere dayanıyor; değiştirmek istersen kapıda **Değiştir** de.\n- Bu cevabı beğendiysen **Karara bağla** ile deftere yazabilirsin.";
+    } else {
+      metin = this.uret(c);
+      // Karar özeti istendiyse (kapı ya da Büyük Birader açık) ve çıktı bir soru bloğu değilse sona eklenir
+      if (c.sistem.includes("# Karar özeti (kovan-ozet)") && !metin.includes("```kovan-soru")) metin += denemeOzeti(c.asama_id);
+    }
     const girdi = Math.floor((c.sistem.length + c.istem.length) / 4);
     const cikti = Math.max(60, Math.floor(metin.length / 4));
     return sonuc({
@@ -1111,6 +1289,15 @@ export class DenemeMotoru implements Motor {
   }
 
   private incele(c: AjanCagrisi): Record<string, unknown> {
+    if (c.rol === "buyuk-birader") {
+      // Akışı göstermek için teknik planda bir uyarı; gerisi uygun
+      if (c.asama_id === "teknik-plan") {
+        return { hukum: "DIKKAT", ozet: "Deneme modu: teknik plan kapsamla uyumlu; bir noktayı bilmen iyi olur.",
+          bulgular: [{ konu: "Varsayılan kapsam", kanit: "belgeler/teknik-plan.md, karar özeti: 'Girdilerde yazmayan konular kapsam dışı sayıldı'", aciklama: "Kapsam dışı sayılanlar arasında beklediğin bir şey olabilir; kapıda kontrol et." }],
+          oneri: "Kapıda 'Varsayılan kapsam' maddesine bak." };
+      }
+      return { hukum: "UYGUN", ozet: "Deneme modu: aşama, fikir ve önceki kararlarla tutarlı.", bulgular: [], oneri: "" };
+    }
     const sorabilir = c.sistem.includes("kovan-soru");
     if (c.rol === "mevzuat" && c.asama_id === "analiz") {
       const fikir = /### fikir\n([\s\S]*?)(?=\n### |\n## |$)/.exec(c.istem)?.[1] ?? "";
@@ -1128,6 +1315,8 @@ export class DenemeMotoru implements Motor {
     if (c.rol === "mevcut-sistem-analisti" && c.asama_id === "hedef-analiz" && !duzeltildi) {
       return { karar: "DUZELT", gerekce: "Deneme modu: eşdeğerlik açığı.", bulgular: ["ŞÜPHE-1 (aynı tarihte yeniden çalıştırmada çift kayıt) için koru mu, düzelt mi kararı yazılmamış."] };
     }
+    // Mevcut proje akışında bilerek düzeltme istenmez: işaret dosyası projeye (ve yamaya) karışırdı
+    if (c.istem.includes("## Mevcut proje\n")) return { karar: "ONAY", gerekce: "Deneme modu: kriterler karşılanıyor.", bulgular: [] };
     const birKezDuzelt = (c.asama_id === "analiz" && ["urun-sahibi", "mimar"].includes(c.rol))
       || (c.asama_id === "be-gelistirme" && ["urun-sahibi", "mimar"].includes(c.rol))
       || (/^(v\d+-)?p1-is-kalemi$/.test(c.asama_id) && c.rol === "mimar");
@@ -1172,6 +1361,10 @@ export class DenemeMotoru implements Motor {
     }
     if (sorabilir && !replatform && c.rol === "urun-sahibi" && c.asama_id === "brif" && !c.istem.includes("### Arayüz dili")) {
       return "Brifi yazmadan önce bir kararına ihtiyacım var.\n\n```kovan-soru\n" + JSON.stringify(DENEME_PO_SORUSU, null, 2) + "\n```";
+    }
+    if (c.istem.includes("## Mevcut proje\n")) {
+      const r = denemeProje(c, !geriBildirimVar);
+      if (r !== null) return r;
     }
     const cwd = c.cwd;
     const yaz = (rel: string, metin: string) => {

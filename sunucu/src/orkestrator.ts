@@ -14,6 +14,10 @@
 // Derin planlama: teslim planındaki iş kalemleri (P1, P2...) kalemler aşamasında sırayla açılır; her kalem
 // kendi kabul testiyle başlar, testler kilitlenir, kod ancak sonra yazılır. Teslimden sonra Ürün Sahibi
 // gelişim önerileri getirir; her biri sana "olmalı mı?" diye sorulur, kabul ettiklerinle yeni sürüm başlar.
+//
+// Mevcut proje üzerinde iş: proje kod/proje/ altına birebir kopyalanır. Keşif aşaması iş önerisini çıkarır (tür, boyut,
+// yazma alanı); öneri kartını sen onaylarsın (.kovan/is.json). Aşamalar boyuta ve tarafa göre süzülür, projenin
+// testleri işe başlamadan koşar (baz çizgisi), yeni testler koddan önce kırmızı olmalıdır. Sonuç yama dosyasıdır (cikti/).
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -23,13 +27,17 @@ import { HEDEF_YIGINLAR, MODLAR, type Ayarlar, type Mod } from "./ayarlar.js";
 import type { Depo } from "./depo.js";
 import type {
   Adim, AjanSorusu, AsamaGorunumu, Bekleme, BeklemeKaynagi, BeklemeSebebi, Cevap, DosyaIcerigi, Fikir, FikirDetayi, FikirOzeti,
-  Adr, GelisimKarari, GelisimKaydi, GelisimOnerisi, Karar, OnayRozeti, Oy, PlanKalemi, PlanKalemiGorunumu, Secenek,
+  Adr, BiraderBulgusu, BiraderDegerlendirmesi, BiraderHukmu, GelisimKarari, GelisimKaydi, GelisimOnerisi, IsBoyutu, IsKaydi, IsOnerisi, IsTuru,
+  Karar, Katilim, OnayKaydi, OnayRozeti, Oy, PlanKalemi, PlanKalemiGorunumu, ProjeBilgisi, Secenek, SohbetMesaji, YamaOzeti,
 } from "./tipler.js";
+import { KATILIMLAR } from "./tipler.js";
 export type { Cevap, Karar };
 import type { AjanKarti } from "./kartlar.js";
-import { KARAR_SEMASI, OY_SEMASI, jsonCikar, soruCikar, sonuc, sorulariDogrula, sureciOldur, type AjanCagrisi, type AjanSonucu, type HamSoru, type Motor } from "./motor.js";
-import { adrCikar, adrDosyaAdi, adrMarkdown, belgeButunlugu, gelisimCikar, kalemleriGenislet, planCikar } from "./plan.js";
+import { BIRADER_SEMASI, KARAR_SEMASI, OY_SEMASI, jsonCikar, soruCikar, sonuc, sorulariDogrula, sureciOldur, type AjanCagrisi, type AjanSonucu, type HamSoru, type Motor } from "./motor.js";
+import { IS_BOYUTLARI, IS_TURLERI, adrCikar, adrDosyaAdi, adrMarkdown, belgeButunlugu, gelisimCikar, isCikar, isDenetle, isUygula, kalemleriGenislet,
+  kosulTutar, ozetCikar, planCikar } from "./plan.js";
 import { KAYNAK_KLASORU, atiflariDenetle, envanterBelgesi, kaynakIceAl } from "./kaynak.js";
+import { PROJE_KLASORU, YAMA_DOSYASI, projeEnvanteri, projeIceAl, yamaOkuBeni, yamaYaz } from "./proje.js";
 import { KovanHatasi, altinda, atomikYaz, bekle, jsonOku, kisalt, kuyruk, simdi } from "./ortak.js";
 
 /** Onaylanan ADR'lerin kod içindeki klasörü (kilitli). */
@@ -120,6 +128,38 @@ Bu aşamada belgeni yazmadan önce projenin sahibiyle bir soru turu yapılır. G
 - Bu sorular ekibe uğramadan projenin sahibine gider. Cevaplar gelince aynı aşama yeniden çalışır ve belgeni yazarsın.
 ${ANLASILIR_SORU}`;
 
+/** Büyük Birader'in kart kimliği (ajanlar/buyuk-birader.md). */
+export const BIRADER = "buyuk-birader";
+const HUKUM_ADI: Record<BiraderHukmu, string> = { UYGUN: "UYGUN", DIKKAT: "DİKKAT", VETO: "VETO" };
+const KAPI_ONAY = "Onaylıyorum";
+const KAPI_DEGISTIR = "Değiştir";
+/** İstemlere giren en uzun belge (karakter); gerisi için ajan dosyayı araçla açar. */
+const EN_UZUN_BELGE = 24_000;
+
+const KARAR_OZETI = `# Karar özeti (kovan-ozet)
+Çıktının EN SONUNA, bu aşamada karara bağlananları şu blokla ekle (kod aşamasında son mesajının sonuna):
+\`\`\`kovan-ozet
+kararlar:
+  - baslik: 3-5 kelime
+    karar: Ne karara bağlandı; bir iki cümle, tek başına anlaşılır.
+    neden: Dayanağı (hangi girdi, hangi karar, hangi kısıt).
+    alternatif: Değerlendirilip seçilmeyen yol; yoksa boş bırak.
+    tur: karar
+\`\`\`
+- 3-8 madde: işin sonucunu en çok değiştiren kararlar. tur: karar, varsayim ya da kapsam.
+- Yaptığın her önemli varsayım ("VARSAYIM:") ayrı bir maddedir (tur: varsayim). Kapsama aldığın ya da dışarıda bıraktığın ana konular ayrı maddelerdir (tur: kapsam).
+- Projenin sahibi bu maddeleri tek tek onaylayacak ya da değiştirecek; belgeyi okumadan anlayabilmeli: düz Türkçe, somut, mümkünse bir örnekle.
+- Kimlikleri (K3, P2, ADR-1, E5) tek başına kullanma; anarsan ne olduğunu aynı cümlede söyle. Dosya yolu, sınıf ya da metot adı yazma.
+- Mimari karar kayıtlarını (kovan-adr) burada tekrar etme; onlar ayrıca sorulur.`;
+
+const SOHBET_KURALLARI = `# Konuşma (projenin sahibi soruyor)
+Projenin sahibi sana doğrudan bir soru soruyor. Bu bir üretim turu değil:
+- Soruyu cevapla: kısa, somut, düz Türkçe. Bilmiyorsan "BİLMİYORUM" de; tahmin ediyorsan "TAHMİN:" diye işaretle.
+- Belgeyi ya da kodu yeniden yazma, hiçbir dosyayı değiştirme. Bir şeyin değişmesi gerektiğini düşünüyorsan neyin, neden ve neye mal olacağını söyle.
+- Karar verme. Seçenek varsa artısıyla eksisiyle sun, önerini söyle; karar projenin sahibinin.
+- "Alınan kararlar" bağlayıcıdır; onlarla çelişen bir şey öneriyorsan bunu açıkça belirt.
+- Soru bloğu (kovan-soru) ya da başka yapılandırılmış blok yazma; yalnızca cevabını yaz.`;
+
 const SORU_HAKKI_DOLDU = "# Soru\nBu aşamada soru hakkın doldu. Belirsizliklerde \"VARSAYIM:\" yazıp devam et.";
 
 const ORTAK_KARAR_KURALLARI = `# Ortak karar (oy)
@@ -155,6 +195,8 @@ const SECENEK_TANIM: Record<string, Omit<Secenek, "anahtar" | "onerilen">> = {
   tekrar_dene: { etiket: "Tekrar dene", aciklama: "Aynı adımı yeniden çalıştır (ör. giriş yaptıktan ya da Ollama'yı açtıktan sonra)." },
   atla: { etiket: "Bu aşamayı atla", aciklama: "Aşamayı çıktısı olmadan geç; sonraki aşamalar eksik girdiyle çalışabilir." },
   butce_artir: { etiket: "Bütçeyi artır ve devam et", aciklama: "Fikir bütçesini %50 (en az 1 $) artır." },
+  birader_atla: { etiket: "Bu aşamada Büyük Birader olmadan devam et", aciklama: "Değerlendirme alınamadı; onay kurulunun kararıyla ilerle. Sonraki aşamalarda Büyük Birader yine bakar." },
+  komut_degistir: { etiket: "Test komutunu değiştir", aciklama: "Notuna yeni komutu yaz (proje kökünde koşar; ör. yalnızca ilgili modülün testleri). Baz çizgisi yeni komutla yeniden koşar." },
   durdur: { etiket: "Durdur", aciklama: "İşi durdur; sonra kaldığı yerden devam ettirebilirsin.", tehlikeli: true },
 };
 
@@ -162,7 +204,27 @@ const SECIM_ETIKET: Record<string, string> = {
   devam: "Olduğu gibi kabul edildi, devam", bir_tur_daha: "Bir tur daha verildi", tekrar_dene: "Tekrar denendi",
   atla: "Aşama atlandı", butce_artir: "Bütçe artırıldı", kabul: "Kabul edildi", geri_gonder: "Notla geri gönderildi",
   claude_devral: "Aşama Claude'a devredildi", durdur: "Durduruldu", kabul_testine_don: "Kabul testine geri gönderildi",
+  komut_degistir: "Test komutu değiştirildi", birader_atla: "Bu aşamada Büyük Birader atlandı",
 };
+
+/** Öneri kartı: boyut seçeneklerinin açıklaması (hangi yoldan geçileceği). */
+const BOYUT_ACIKLAMA: Record<IsBoyutu, string> = {
+  kucuk: "Tek tarafta, birkaç dosyalık iş. Önce hatayı ya da isteği yakalayan test yazılır ve kilitlenir, sonra düzeltme.",
+  orta: "Birkaç parçalı iş. Fark analizi, teslim planı ve kalemler; her kalem kendi kabul testiyle.",
+  buyuk: "Yeni modül ya da mimari karar gerektiren iş. Ortaya ek olarak teknik plan, ADR ve (arayüz varsa) UX tasarım.",
+};
+const TUR_ACIKLAMA: Record<IsTuru, string> = {
+  hata: "Var olan davranış yanlış; kök neden düzeltilir, mevcut davranışın gerisi korunur.",
+  ozellik: "Yeni davranış eklenir ya da var olan bilerek değiştirilir.",
+  entegrasyon: "Başka bir sistemle bağlantı: sözleşmeden sahte karşı taraf ve sözleşme testi, sonra adaptör.",
+};
+const TUR_REHBERI: Record<IsTuru, string> = {
+  hata: "Bu bir hata düzeltmesi: kök nedeni düzelt, belirtiyi maskeleme. Değişiklik en küçük olsun; ilgisiz yeri yeniden yazma.",
+  ozellik: "Bu yeni bir özellik: mevcut davranışı bozma; yeni davranış yalnızca istenen kapsamda olsun.",
+  entegrasyon: "Bu bir entegrasyon: karşı sistemin sözleşmesi eklerde. Gerçek ağa çıkma; testlerde sözleşmeden üretilmiş sahte karşı taraf kullan. " +
+    "Adres, kullanıcı adı, parola ve anahtar koda ya da teste yazılmaz; yalnızca yapılandırma ya da ortam değişkeni adıyla okunur.",
+};
+const ALAN_ONAYI = "Onayla";
 
 function secenekler(anahtarlar: string[], onerilen?: string): Secenek[] {
   const sirali = onerilen && anahtarlar.includes(onerilen) ? [onerilen, ...anahtarlar.filter((a) => a !== onerilen)] : anahtarlar;
@@ -222,6 +284,7 @@ interface HamOy {
   gerekce: string;
 }
 
+const sadeMetin = (x: string) => x.toLocaleLowerCase("tr").replace(/\s+/g, " ").trim();
 const temizEtiket = (e: string) => e.replace(/\s*\(Önerilen\)\s*$/i, "").trim();
 
 /** Hepsi yerel modunda yerel motor bulunamazsa kullanılan yer tutucu: hiçbir şeyi buluta göndermez, her çağrıda hata verir. */
@@ -238,6 +301,10 @@ export class Orkestrator {
   private durdurIstekleri = new Set<string>();
   /** Revizyon turunda üretimden önceki belge ("fid/aşama"): belge bütünlüğü denetimi bununla karşılaştırır. */
   private oncekiBelgeler = new Map<string, string>();
+  /** Kırmızı beklenen test denetiminin son çıktısı ("fid/aşama"): onay kurulu doğru sebeple mi kırmızı diye bakar. */
+  private kirmiziCiktilar = new Map<string, string>();
+  /** Cevabı beklenen konuşma çağrıları (fikir başına aynı anda tek soru). */
+  private sohbetCalisan = new Set<string>();
   private surecler = new Map<string, Set<import("node:child_process").ChildProcess>>();
   private kuyrukListe: string[] = [];
   private calisanlar = new Set<string>();
@@ -261,6 +328,7 @@ export class Orkestrator {
     for (const id of cfg.ortak_karar.kurul) {
       if (!kartlar.has(id)) throw new KovanHatasi(`kovan.yaml: ortak_karar.kurul içindeki '${id}' için ajan kartı yok`);
     }
+    if (cfg.buyuk_birader.acik && !kartlar.has(BIRADER)) throw new KovanHatasi(`ayarlar: buyuk_birader açık ama ajanlar/${BIRADER}.md yok. Kartı geri koy ya da buyuk_birader: false yap.`);
     this.kurtar();
   }
 
@@ -305,6 +373,7 @@ export class Orkestrator {
       for (const r of [...ajanlar, ...a.dogrulama.map((v) => v.inceleyen)]) if (r && this.kartlar.has(r)) adlar.add(this.kartlar.get(r)!.motor);
     }
     if (this.ortakKararAcik(akis)) for (const id of this.cfg.ortak_karar.kurul) adlar.add(this.kartlar.get(id)!.motor);
+    if (this.cfg.buyuk_birader.acik && akis.buyuk_birader) adlar.add(this.kartlar.get(BIRADER)!.motor);
     return adlar.size ? [...adlar] : ["claude"];
   }
 
@@ -333,7 +402,7 @@ export class Orkestrator {
 
   // ================================ dış arayüz ================================
   /** ek.kaynaklar: mevcut sistemin klasörleri/dosyaları (replatform). ek.hedef_yigin: hazır yığın kimliği ya da serbest metin. */
-  async yeniFikir(baslik: string, metin: string, profil: string, mod: string, ek: { kaynaklar?: string[]; hedef_yigin?: string } = {}): Promise<string> {
+  async yeniFikir(baslik: string, metin: string, profil: string, mod: string, ek: { kaynaklar?: string[]; hedef_yigin?: string; proje?: string; katilim?: string } = {}): Promise<string> {
     return this.fikirOlustur(baslik, metin, profil, mod, null, ek);
   }
 
@@ -342,18 +411,20 @@ export class Orkestrator {
     const f = this.fikirAl(fid);
     if (f.durum !== "tamamlandi") throw new KovanHatasi("Yeni sürüm yalnızca tamamlanmış bir fikirden başlatılabilir.");
     if (f.sonraki_surum) throw new KovanHatasi(`Bu fikrin yeni sürümü zaten başlatıldı: ${f.sonraki_surum}`);
+    if (f.proje) throw new KovanHatasi("Mevcut proje işinde yeni sürüm yok: yamayı projene uygula, sonraki istek için aynı projeyle yeni bir iş başlat.");
     const tohum = (metin ?? "").trim() || this.sonrakiSurumMetni(fid);
     if (!tohum) throw new KovanHatasi("Kabul edilmiş bir gelişim önerisi yok; yeni sürümde ne istediğini yaz.");
     const surum = (f.surum ?? 1) + 1;
     const baslik = `${f.baslik.replace(/\s+v\d+$/, "")} v${surum}`;
-    const yeni = await this.fikirOlustur(baslik, tohum, f.profil, f.motor, { kaynak: fid, surum });
+    const yeni = await this.fikirOlustur(baslik, tohum, f.profil, f.motor, { kaynak: fid, surum }, { katilim: f.katilim });
     this.depo.fikirGuncelle(fid, { sonraki_surum: yeni });
     return yeni;
   }
 
   private async fikirOlustur(baslik: string, metin: string, profil: string, mod: string, onceki: { kaynak: string; surum: number } | null,
-    ek: { kaynaklar?: string[]; hedef_yigin?: string } = {}): Promise<string> {
+    ek: { kaynaklar?: string[]; hedef_yigin?: string; proje?: string; katilim?: string } = {}): Promise<string> {
     metin = (metin ?? "").trim();
+    const katilim = this.katilimCoz(ek.katilim);
     if (!metin) throw new KovanHatasi("Fikir metni boş olamaz.");
     const akis = this.akislar.get(profil);
     if (!akis) throw new KovanHatasi(`Bilinmeyen akış: ${profil}`);
@@ -363,10 +434,13 @@ export class Orkestrator {
     if (akis.kaynak === "zorunlu" && !kaynaklar.length && !onceki) {
       throw new KovanHatasi(`'${akis.ad}' akışı mevcut sistemin kaynaklarıyla başlar: kodun ve analiz dokümanının bulunduğu klasörü yaz.`);
     }
-    if (akis.kaynak !== "zorunlu" && kaynaklar.length) {
+    if (akis.kaynak === "yok" && kaynaklar.length) {
       throw new KovanHatasi(`'${akis.ad}' akışı mevcut sistem kaynağı almaz. Var olan bir sistemi yeniden yazmak için Replatform akışını seç.`);
     }
-    const hedefYigin = this.hedefYiginCoz(ek.hedef_yigin);
+    const projeYolu = (ek.proje ?? "").trim();
+    if (akis.kaynak === "proje" && !projeYolu) throw new KovanHatasi(`'${akis.ad}' akışı projenin klasörüyle başlar: projenin bu makinedeki yolunu yaz.`);
+    if (akis.kaynak !== "proje" && projeYolu) throw new KovanHatasi(`'${akis.ad}' akışı proje yolu almaz. Var olan bir projede değişiklik için 'Mevcut proje üzerinde iş' başlangıcını seç.`);
+    const hedefYigin = akis.kaynak === "proje" ? null : this.hedefYiginCoz(ek.hedef_yigin);
     for (const ad of this.gerekenMotorlar(akis, mod as Mod)) {
       const m = this.motorlar.get(ad)!;
       if (!(await m.saglik(true))) {
@@ -383,10 +457,22 @@ export class Orkestrator {
     for (const alt of ["belgeler", "kod", "incelemeler", "gunluk", ".kovan"]) fs.mkdirSync(path.join(d, alt), { recursive: true });
     fs.writeFileSync(path.join(d, "belgeler", "fikir.md"), metin + "\n", "utf8");
     let kaynakBilgisi: Fikir["kaynak"] = null;
+    let projeBilgisi: ProjeBilgisi | null = null;
+    if (projeYolu) {
+      try {
+        const o = projeIceAl(projeYolu, path.join(d, "kod", PROJE_KLASORU), this.projeAsilYolu(fid));
+        fs.writeFileSync(path.join(d, "belgeler", "proje-envanteri.md"), projeEnvanteri(o), "utf8");
+        projeBilgisi = { yol: o.yol, dosya_sayisi: o.dosya_sayisi, satir: o.satir, boyut: o.boyut, utf8_olmayan: o.utf8_olmayan.length, atlanan: o.atlanan.length, test_komutu: o.test_komutu };
+      } catch (e) {
+        fs.rmSync(d, { recursive: true, force: true });
+        throw e;
+      }
+    }
     if (kaynaklar.length) {
       try {
         const o = await kaynakIceAl(kaynaklar, path.join(d, "kod", KAYNAK_KLASORU));
-        fs.writeFileSync(path.join(d, "belgeler", "kaynak-envanteri.md"), envanterBelgesi(o), "utf8");
+        fs.writeFileSync(path.join(d, "belgeler", "kaynak-envanteri.md"), envanterBelgesi(o, projeBilgisi
+          ? `Bu iş için verilen ekler (sözleşme, hata detayı, test senaryosu, analiz notu) \`${KAYNAK_KLASORU}/\` klasöründe (salt okunur, kilitli).` : undefined), "utf8");
         kaynakBilgisi = { yollar: o.yollar, dosya_sayisi: o.dosya_sayisi, satir: o.satir, boyut: o.boyut, donusturulen: o.donusturulen.length, atlanan: o.atlanan.length };
       } catch (e) {
         fs.rmSync(d, { recursive: true, force: true });
@@ -417,15 +503,21 @@ export class Orkestrator {
       durum: "sirada", asama_idx: 0, tur: 1, faz: "uret", ek_tur: 0, soru_turu: 0, onaylayanlar: [], geri_bildirim: null, bekleme: null,
       butce_usd: akis.fikir_butcesi_usd, maliyet_usd: 0, girdi_token: 0, cikti_token: 0, istisnalar: {},
       surum: onceki?.surum ?? 1, temel_fikir: onceki?.kaynak ?? null, sonraki_surum: null, kapsam_disi: [],
-      kaynak: kaynakBilgisi, hedef_yigin: hedefYigin ?? (onceki ? this.depo.fikir(onceki.kaynak)?.hedef_yigin ?? null : null),
+      kaynak: kaynakBilgisi, proje: projeBilgisi, katilim, birader_veto: 0, hedef_yigin: hedefYigin ?? (onceki ? this.depo.fikir(onceki.kaynak)?.hedef_yigin ?? null : null),
       olusturma: zaman, guncelleme: zaman, baslama: null, bitis: null,
     });
+    if (projeBilgisi) {
+      this.sistemAdimi(fid, null, "Proje", "tamam", `Proje alındı: ${projeBilgisi.dosya_sayisi.toLocaleString("tr-TR")} dosya, ${projeBilgisi.satir.toLocaleString("tr-TR")} satır. ` +
+        "Çalışma kopyası kod/proje/ altında; asıl klasöre dokunulmaz, sonuç yama dosyası olarak çıkar." +
+        (projeBilgisi.atlanan ? ` ${projeBilgisi.atlanan} öğe alınmadı (envantere bak).` : "") +
+        (projeBilgisi.utf8_olmayan ? ` ${projeBilgisi.utf8_olmayan} dosya UTF-8 değil (envantere bak).` : ""));
+    }
     if (fs.existsSync(path.join(d, "kod", KAYNAK_KLASORU))) {
       this.yollariKilitle(fid, [KAYNAK_KLASORU]);
       const k = this.depo.fikir(fid)!.kaynak;
-      this.sistemAdimi(fid, null, "Kaynak", "kilit", k
-        ? `Mevcut sistem alındı ve kilitlendi: ${k.dosya_sayisi} dosya, ${k.satir.toLocaleString("tr-TR")} satır` + (k.donusturulen ? `, ${k.donusturulen} Word belgesi HTML'e çevrildi` : "") + (k.atlanan ? `, ${k.atlanan} öğe alınmadı (envantere bak)` : "")
-        : "Mevcut sistemin kaynakları kilitlendi.");
+      this.sistemAdimi(fid, null, projeBilgisi ? "Ekler" : "Kaynak", "kilit", k
+        ? `${projeBilgisi ? "Ekler alındı ve kilitlendi" : "Mevcut sistem alındı ve kilitlendi"}: ${k.dosya_sayisi} dosya, ${k.satir.toLocaleString("tr-TR")} satır` + (k.donusturulen ? `, ${k.donusturulen} Word belgesi HTML'e çevrildi` : "") + (k.atlanan ? `, ${k.atlanan} öğe alınmadı (envantere bak)` : "")
+        : projeBilgisi ? "Ekler kilitlendi." : "Mevcut sistemin kaynakları kilitlendi.");
     }
     if (hedefYigin && !onceki) {
       this.kararlariYaz(fid, [...this.kararlar(fid), {
@@ -473,10 +565,21 @@ export class Orkestrator {
       case "durdur":
         Object.assign(g, { durum: "durduruldu", bitis: simdi() });
         break;
+      case "birader_atla":
+        if (!asama) throw new KovanHatasi("Atlanacak aşama yok.");
+        g.istisnalar = { ...f.istisnalar, [`birader:${asama.id}`]: "atla" };
+        break;
+      case "komut_degistir": {
+        if (!not) throw new KovanHatasi("Yeni test komutunu not olarak yaz (proje kökünde koşar).");
+        const is = this.isOku(fid);
+        if (!is) throw new KovanHatasi("Bu fikirde onaylanmış bir iş önerisi yok.");
+        this.isYaz(fid, { ...is, test_komutu: this.komutDenetle(not) });
+        break;
+      }
       case "devam": case "kabul": case "atla":
-        if (secim === "devam" && asama?.kilitle.length) this.kilitle(fid, asama);
-        // Tur sınırında "devam" ile geçilen aşamanın ADR'leri de kod/adr/ altına yazılır (biçimi geçerliyse)
-        if (secim === "devam" && asama?.dogrulama.some((v) => v.tip === "adr")) this.adrYaz(fid, asama);
+        if (asama?.tur === "kesif") throw new KovanHatasi("Keşif atlanamaz: onaylanmış iş önerisi olmadan sonraki aşamalar çalışamaz.");
+        // Tur sınırında "devam" ile geçilen aşama da tamamlanır: kilitler ve (biçimi geçerliyse) ADR'ler yazılır
+        if (secim === "devam" && asama) this.asamaTamamla(fid, asama);
         if (secim === "atla" && asama) this.sistemAdimi(fid, asama, "Atlandı", "atlandi", gelisimAtla ? "Gelişim önerileri şimdilik değerlendirilmedi." : "Aşama senin kararınla atlandı.");
         Object.assign(g, this.ilerlemeAlanlari(fid, idx + 1));
         break;
@@ -500,7 +603,7 @@ export class Orkestrator {
         const test = asama ? this.kabulTestiAsamasi(f, asama) : null;
         if (!test) throw new KovanHatasi("Bu aşamanın kilitli bir kabul testi aşaması yok.");
         const hidx = asamalar.findIndex((a) => a.id === test.id);
-        Object.assign(g, { asama_idx: hidx, tur: 1, faz: "uret", ek_tur: 0, soru_turu: 0, onaylayanlar: [],
+        Object.assign(g, { asama_idx: hidx, tur: 1, faz: "uret", ek_tur: 0, soru_turu: 0, onaylayanlar: [], birader_veto: 0,
           geri_bildirim: `### İnsanın notu (iş kaleminden geri gönderildi: kilitli testte hata)\n${not}` });
         break;
       }
@@ -514,8 +617,8 @@ export class Orkestrator {
         }
         const hidx = asamalar.findIndex((a) => a.id === h);
         if (hidx < 0) throw new KovanHatasi(`Böyle bir aşama yok: ${h}`);
-        if (hidx >= idx || asamalar[hidx].tur !== "ajan") throw new KovanHatasi("Yalnızca önceki bir ajan aşamasına geri gönderebilirsin.");
-        Object.assign(g, { asama_idx: hidx, tur: 1, faz: "uret", ek_tur: 0, soru_turu: 0, onaylayanlar: [], geri_bildirim: `### İnsanın notu\n${not}` });
+        if (hidx >= idx || !["ajan", "kesif"].includes(asamalar[hidx].tur)) throw new KovanHatasi("Yalnızca önceki bir ajan aşamasına geri gönderebilirsin.");
+        Object.assign(g, { asama_idx: hidx, tur: 1, faz: "uret", ek_tur: 0, soru_turu: 0, onaylayanlar: [], birader_veto: 0, geri_bildirim: `### İnsanın notu\n${not}` });
         break;
       }
       default:
@@ -558,6 +661,67 @@ export class Orkestrator {
       ozet = "Gelişim önerileri: " + yeni.map((k) => `${k.id} ${k.baslik} → ${GELISIM_ETIKET[k.karar]}`).join(" · ");
       dosya = "belgeler/gelisim-defteri.md";
       Object.assign(g, this.ilerlemeAlanlari(fid, f.asama_idx + 1));
+    } else if (b.kaynak === "kapi") {
+      // Aşama sonu kapısı: karar özeti maddeleri, mimari kararlar ve belgenin geneli. Not, değişiklik isteğidir.
+      const asama = this.asamalar(f)[f.asama_idx];
+      if (!asama || asama.id !== b.asama_id) throw new KovanHatasi("Kapının aşaması bulunamadı; fikri durdurup devam ettir.");
+      const degisen: { s: AjanSorusu; metin: string }[] = [];
+      for (const { s, secilen, serbest } of okunan) {
+        if (s.kapi?.tur === "adr") {
+          if (!secilen.length) throw new KovanHatasi(`"${s.baslik}" için seçeneklerden birini seç; notun ayrıca işlenir.`);
+          const farkli = sadeMetin(secilen[0]) !== sadeMetin(s.kapi.oneri ?? "");
+          if (farkli) degisen.push({ s, metin: `"${secilen[0]}" seçildi (öneri "${s.kapi.oneri}" idi).${serbest ? ` Not: ${serbest}` : ""}` });
+          else if (serbest) degisen.push({ s, metin: `"${secilen[0]}" kalsın; not: ${serbest}` });
+        } else {
+          if (secilen[0] === KAPI_DEGISTIR && !serbest) throw new KovanHatasi(`"${s.baslik}": neyin değişmesini istediğini yaz.`);
+          if (serbest) degisen.push({ s, metin: serbest });
+        }
+      }
+      g.soru_turu = f.soru_turu;   // kapı, ajanın soru hakkından yemez
+      if (degisen.length) {
+        this.kararlariYaz(fid, [...this.kararlar(fid), ...degisen.map(({ s, metin }): Karar => ({
+          zaman: simdi(), asama_id: b.asama_id, asama_ad: b.asama_ad, soran: "Kovan (aşama onayı)", baslik: s.baslik, soru: s.soru, cevap: metin, karar_veren: "insan",
+        }))]);
+        ozet = `${b.asama_ad}: ${degisen.length} değişiklik istendi (${degisen.map((d) => d.s.baslik).join(", ")}); aşama yeniden çalışıyor`;
+        dosya = "belgeler/kararlar.md";
+        Object.assign(g, { faz: "uret", tur: f.tur + 1, ek_tur: f.ek_tur + 1, onaylayanlar: [], birader_veto: 0,
+          geri_bildirim: "### Projenin sahibinin kararları (aşama onayı)\n" + degisen.map((d) => `- **${d.s.baslik}**: ${d.metin}`).join("\n") +
+            "\n\nYalnızca bu maddeleri işle; onayladığı diğer kararları ve belgenin gerisini koru." });
+      } else {
+        this.asamaTamamla(fid, asama);
+        this.onayYaz(fid, asama, okunan.filter(({ s }) => s.kapi?.tur !== "genel")
+          .map(({ s, secilen }) => ({ baslik: s.baslik, karar: s.kapi?.tur === "adr" ? secilen[0] : s.soru.split("\n")[0] })));
+        ozet = `${b.asama_ad} onaylandı: ${okunan.length - 1} karar`;
+        dosya = "belgeler/onaylar.md";
+        Object.assign(g, this.ilerlemeAlanlari(fid, f.asama_idx + 1));
+      }
+    } else if (b.kaynak === "kesif") {
+      // Öneri kartı: tür, boyut, test komutu, yazma alanı. Alan onaylanmadıysa keşif notla yeniden çalışır.
+      const [turC, boyutC, komutC, alanC] = okunan;
+      const oneri = this.isOnerisi(fid, b.asama_id);
+      if (!oneri || okunan.length !== 4) throw new KovanHatasi("Keşif belgesindeki iş önerisi okunamadı; fikri durdurup keşfi yeniden çalıştır.");
+      if (!alanC.secilen.length) {
+        ozet = `Yazma alanı onaylanmadı; keşif notla yeniden çalışıyor: ${alanC.serbest}`;
+        dosya = "";
+        Object.assign(g, { faz: "uret", tur: f.tur + 1, geri_bildirim: `### İnsanın notu (iş önerisi)\n${alanC.serbest}` });
+      } else {
+        const anahtar = <T extends string>(adlar: Record<T, string>, c: typeof turC): T => {
+          const k = (Object.keys(adlar) as T[]).find((x) => adlar[x] === c.secilen[0]);
+          if (!k) throw new KovanHatasi(`"${c.s.baslik}" için seçeneklerden birini seç; notun ayrıca kaydedilir.`);
+          return k;
+        };
+        const is: IsKaydi = { ...oneri, tur: anahtar(IS_TURLERI, turC), boyut: anahtar(IS_BOYUTLARI, boyutC), test_komutu: this.komutDenetle(komutC.serbest || komutC.secilen[0] || "") };
+        const hatalar = isDenetle(is);
+        if (hatalar.length) throw new KovanHatasi(hatalar.join(" "));
+        this.isYaz(fid, is);
+        this.kararlariYaz(fid, [...this.kararlar(fid), ...okunan.map(({ s, secilen, serbest }): Karar => ({
+          zaman: simdi(), asama_id: b.asama_id, asama_ad: b.asama_ad, soran: s.soran_ad, baslik: s.baslik, soru: s.soru,
+          cevap: s.baslik === "Test komutu" ? is.test_komutu : [secilen.join(", "), serbest].filter(Boolean).join(" · Not: "), karar_veren: "insan",
+        }))]);
+        ozet = `İş önerisi onaylandı: ${IS_TURLERI[is.tur]}, ${IS_BOYUTLARI[is.boyut]}, test komutu: ${is.test_komutu}`;
+        dosya = "belgeler/kararlar.md";
+        Object.assign(g, this.ilerlemeAlanlari(fid, f.asama_idx + 1));
+      }
     } else {
       const yeni: Karar[] = okunan.map(({ s, secilen, serbest }) => ({
         zaman: simdi(), asama_id: b.asama_id, asama_ad: b.asama_ad, soran: s.soran_ad, baslik: s.baslik, soru: s.soru,
@@ -586,7 +750,7 @@ export class Orkestrator {
   }
 
   /** Fikrin klasörü (mutlak yol): belgeler/, kod/, incelemeler/ burada. */
-  fikirKlasoru(fid: string, alt: "" | "kod" | "belgeler" = ""): string {
+  fikirKlasoru(fid: string, alt: "" | "kod" | "belgeler" | "cikti" = ""): string {
     this.fikirAl(fid);
     return path.join(this.calisma, fid, alt);
   }
@@ -600,6 +764,7 @@ export class Orkestrator {
       if (sirada >= 0) this.kuyrukListe.splice(sirada, 1);
       if (!this.calisanlar.has(fid)) this.durdurUygula(fid);
     } else if (f.durum === "bekliyor") {
+      for (const p of this.surecler.get(fid) ?? []) sureciOldur(p);   // süren bir konuşma çağrısı varsa
       if (f.bekleme) this.depo.adimGuncelle(fid, f.bekleme.adim_id, { durum: "karar", bitis: simdi(), ozet: kisalt(`${f.bekleme.mesaj} → Durduruldu`, 300) });
       this.depo.fikirGuncelle(fid, { durum: "durduruldu", bekleme: null, bitis: simdi() });
     } else {
@@ -637,6 +802,7 @@ export class Orkestrator {
         id: f.id, baslik: f.baslik, durum: f.durum, profil: f.profil, akis_ad: akis?.ad ?? f.profil, motor: f.motor,
         maliyet_usd: f.maliyet_usd, butce_usd: f.butce_usd, olusturma: f.olusturma, guncelleme: f.guncelleme, asama_ad: asama?.ad ?? "Teslim",
         asama_no: f.asama_idx + 1, asama_sayisi: asamalar.length, bekleme_sebebi: f.bekleme?.sebep ?? null,
+        birader: this.biraderDefteri(f.id).at(-1)?.hukum ?? null,
       };
     });
   }
@@ -651,7 +817,8 @@ export class Orkestrator {
       else if (i === f.asama_idx) durum = ({ bekliyor: "bekliyor", calisiyor: "aktif", sirada: "sirada", durduruldu: "durdu" } as Record<string, AsamaGorunumu["durum"]>)[f.durum] ?? "aktif";
       else durum = "bekleyen";
       const kart = a.ajan ? this.kartlar.get(a.ajan) : undefined;
-      const [ajan, ajanAd] = kart ? [kart.kisaltma, kart.ad] : a.tur === "kalemler" ? ["PLAN", "Teslim planındaki iş kalemleri"] : ["Sen", "Sen"];
+      const [ajan, ajanAd] = kart ? [kart.kisaltma, kart.ad] : a.tur === "kalemler" ? ["PLAN", "Teslim planındaki iş kalemleri"]
+        : a.tur === "kontrol" ? ["TEST", "Sistem (projenin test komutu)"] : a.ajan === "{gelistirici}" ? ["YAZ", "İşin yazılımcısı (öneri kartına göre)"] : ["Sen", "Sen"];
       return {
         id: a.id, ad: a.ad, tur: a.tur, kalem: a.kalem?.id ?? null, kalem_baslik: a.kalem?.baslik ?? null, durum, ajan, ajan_ad: ajanAd,
         motor: kart ? this.motorSec(f, kart, a, true).ad : null,
@@ -679,6 +846,13 @@ export class Orkestrator {
       plan: planGorunumu,
       gelisim: this.gelisimDefteri(fid),
       adrler: this.adrOku(fid),
+      birader_acik: this.biraderAcik(f),
+      birader: this.biraderDefteri(fid),
+      onaylar: this.onaylar(fid),
+      sohbet: this.sohbetOku(fid),
+      sohbet_hedefleri: this.sohbetHedefleri(f),
+      is: this.isOku(fid),
+      yama: this.yamaOzeti(fid),
       sonraki_surum_metni: f.durum === "tamamlandi" && !f.sonraki_surum ? this.sonrakiSurumMetni(fid) || null : null,
       dosyalar: this.dosyaListesi(fid),
       onizlemeler: this.onizlemeler(fid),
@@ -690,7 +864,7 @@ export class Orkestrator {
   }
 
   private onayRozetleri(f: Fikir, a: Asama, adimlar: Adim[]): OnayRozeti[] {
-    return a.dogrulama.map((v) => {
+    const rozetler = a.dogrulama.map((v): OnayRozeti => {
       if (v.tip !== "ajan") {
         const son = adimlar.filter((s) => s.asama_id === a.id && s.tip === "kontrol" && s.ajan_ad === v.ad).at(-1);
         const kisa = { plan: "PLAN", atif: "ATIF", adr: "ADR", komut: "TEST" }[v.tip];
@@ -701,6 +875,11 @@ export class Orkestrator {
       const atlandi = !son && v.atlanabilir && (f.kapsam_disi ?? []).includes(kart.id);
       return { ad: `${v.ad} · ${kart.ad}`, kisa: kart.kisaltma, durum: atlandi ? "atlandi" : son?.durum ?? null };
     });
+    if (this.biraderBakar(f, a)) {
+      const son = adimlar.filter((s) => s.asama_id === a.id && s.tip === "inceleme" && s.ajan === BIRADER).at(-1);
+      rozetler.push({ ad: "Büyük Birader", kisa: "BB", durum: son?.durum ?? null });
+    }
+    return rozetler;
   }
 
   dosyaYolu(fid: string, yol: string): string {
@@ -738,6 +917,11 @@ export class Orkestrator {
       if (this.adrOku(f.id).length) continue;
       const gecilen = this.asamalar(f).slice(0, f.asama_idx).filter((a) => a.dogrulama.some((v) => v.tip === "adr"));
       for (const a of gecilen) this.adrYaz(f.id, a);
+    }
+    for (const f of this.depo.fikirler()) {
+      const sohbet = this.sohbetOku(f.id);
+      if (!sohbet.some((m) => m.durum === "bekliyor")) continue;
+      this.sohbetYaz(f.id, sohbet.map((m) => (m.durum === "bekliyor" ? { ...m, durum: "hata", cevap: "Kovan yeniden başladı; soru cevaplanamadı. Yeniden sor." } : m)));
     }
     for (const f of this.depo.durumdakiler("calisiyor", "sirada")) {
       const asama = this.asamalar(f)[f.asama_idx] ?? null;
@@ -798,6 +982,7 @@ export class Orkestrator {
       const asamalar = this.asamalar(f);
       const idx = f.asama_idx;
       if (idx >= asamalar.length) {
+        this.yamaCikar(fid, true);
         this.depo.fikirGuncelle(fid, { durum: "tamamlandi", bitis: simdi() });
         this.sistemAdimi(fid, null, "Teslim", "tamam", "Akış tamamlandı.");
         return;
@@ -817,7 +1002,7 @@ export class Orkestrator {
   /** Teslim planındaki kalemleri okur; kalemler aşaması bundan sonra kalemlerin somut aşamaları olarak görünür. */
   private planAc(fid: string, sablon: Asama): "ok" | "bekle" {
     const f = this.depo.fikir(fid)!;
-    const p = planCikar(this.belgeOku(fid, sablon.plan), Object.keys(sablon.gelistiriciler));
+    const p = planCikar(this.belgeOku(fid, sablon.plan), this.planGelistiricileri(fid, Object.keys(sablon.gelistiriciler)));
     if (!p.kalemler) {
       const planAsamasi = this.asamalar(f).find((a) => a.cikti === sablon.plan);
       return this.bekleyeAl(fid, { ...sablon, geri_donus: sablon.geri_donus ?? planAsamasi?.id ?? null }, "hata",
@@ -832,9 +1017,11 @@ export class Orkestrator {
 
   private async asamaYurut(fid: string, asama: Asama): Promise<Sonuc> {
     if (asama.tur === "insan") {
+      this.yamaCikar(fid);
       return this.bekleyeAl(fid, asama, "insan", asama.soru || "Onayın gerekiyor.", secenekler(["kabul", "geri_gonder", "durdur"], "kabul"),
         this.teslimOzeti(fid));
     }
+    if (asama.tur === "kontrol") return this.kontrolYurut(fid, asama);
     for (;;) {
       if (this.durdurIstekleri.has(fid)) { this.durdurUygula(fid); return "dur"; }
       const f = this.depo.fikir(fid)!;
@@ -851,13 +1038,24 @@ export class Orkestrator {
       const [bulgular, r] = await this.dogrula(fid, asama, tur, ekBulgular);
       if (r === "tekrar") continue;
       if (r !== "ok") return r;
+      // Onay kurulu geçirdiyse Büyük Birader işin tamamına bakar; veto, aşamayı yazarına geri gönderir.
+      let vetoTuru = 0;
       if (!bulgular.length) {
-        if (asama.kilitle.length) this.kilitle(fid, asama);
-        if (asama.dogrulama.some((v) => v.tip === "adr")) this.adrYaz(fid, asama);
+        const b = await this.biraderDegerlendir(fid, asama, tur);
+        if (b.sonuc === "dur" || b.sonuc === "bekle") return b.sonuc;
+        if (b.sonuc === "veto") { bulgular.push(b.bulgu!); vetoTuru = 1; }
+      }
+      if (!bulgular.length) {
+        // Senin kapın: kararları onaylamadan aşama tamamlanmaz (kilit ve ADR yazımı onaydan sonra)
+        if (this.kapiEtkin(this.depo.fikir(fid)!, asama) && !this.kapiOnayli(fid, asama)) return this.kapiSor(fid, asama);
+        this.asamaTamamla(fid, asama);
         if (asama.tur === "gelisim") return this.gelisimSor(fid, asama);
+        if (asama.tur === "kesif") return this.kesifSor(fid, asama);
         return "ok";
       }
       const gb = [...ekBulgular, ...bulgular].join("\n\n");
+      // Veto turu aşamanın kendi tur hakkından yemez
+      if (vetoTuru) { this.depo.fikirGuncelle(fid, { tur: tur + 1, ek_tur: f.ek_tur + 1, faz: "uret", geri_bildirim: gb }); continue; }
       if (tur >= sinir) {
         this.depo.fikirGuncelle(fid, { faz: "uret", geri_bildirim: gb });
         const devral = this.devralinabilir(this.depo.fikir(fid)!, asama);
@@ -889,7 +1087,8 @@ export class Orkestrator {
     const oncekiBelge = geriBildirim && asama.cikti && (!dizinModu || asama.salt_okunur) ? this.belgeOku(fid, asama.cikti) : "";
     if (oncekiBelge) this.oncekiBelgeler.set(butunlukAnahtari, oncekiBelge); else this.oncekiBelgeler.delete(butunlukAnahtari);
     const onceSoru = this.onceSoruTuru(f, asama, tur, geriBildirim);
-    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, onceSoru ? ONCE_SORU : this.soruKurallari(f, false, asama)].filter(Boolean).join("\n\n");
+    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, onceSoru ? ONCE_SORU : this.soruKurallari(f, false, asama),
+      !onceSoru && this.ozetIstenir(f, asama) ? KARAR_OZETI : ""].filter(Boolean).join("\n\n");
     let son: AjanSonucu | null = null;
     let sonHata = "";
     let deneme = 0;
@@ -932,6 +1131,8 @@ export class Orkestrator {
         this.adimKapat(fid, adim, "tamam", son, ozetSatiri(metin), yol);
         // Teslim planı yeniden yazıldıysa kalemler, aşamaya gelindiğinde yeni plandan açılır.
         if (this.akislar.get(f.profil)!.asamalar.some((a) => a.tur === "kalemler" && a.plan === asama.cikti)) fs.rmSync(this.planYolu(fid), { force: true });
+        // Keşif yeniden yazıldıysa öneri kartı yeniden onaylanır; eski kart ve ona göre açılmış plan geçersizdir.
+        if (asama.tur === "kesif") for (const y of [this.isYolu(fid), this.planYolu(fid)]) fs.rmSync(y, { force: true });
         if (metin.includes("TEST ŞÜPHESİ")) {
           this.sistemAdimi(fid, asama, "Test şüphesi", "uyari", kisalt(metin.split("TEST ŞÜPHESİ")[1].replace(/^[:\s]+/, ""), 400));
         }
@@ -952,8 +1153,27 @@ export class Orkestrator {
     const bulgular: string[] = [];
     for (const v of asama.dogrulama.filter((x) => x.tip === "komut")) {
       if (this.durdurIstekleri.has(fid)) { this.durdurUygula(fid); return [[], "dur"]; }
-      const [yesil, cikti] = await this.komutKos(fid, asama, v, tur);
+      // Test aşamasına kod yazıldıktan sonra dönüldüyse (geri gönderme, kabul testine dönüş) "önce kırmızı" artık sınanamaz:
+      // düzeltilen test, sıradaki kod aşamasının yeniden doğrulamasında yeşil olarak koşar.
+      if (v.beklenen === "kirmizi" && this.sonrakiKodYazildi(fid, asama)) {
+        this.kirmiziCiktilar.delete(`${fid}/${asama.id}`);
+        this.sistemAdimi(fid, asama, v.ad, "atlandi-denetim", "Kod zaten yazıldı; test kırmızı beklenmez. Düzeltilen test, sıradaki kod aşaması yeniden doğrulanırken yeşil olarak koşar.");
+        continue;
+      }
+      const [yesil, cikti, zamanAsimi] = await this.komutKos(fid, asama, v, tur);
       if (yesil === null) return [[], "dur"];
+      if (v.beklenen === "kirmizi") {
+        // Yeni testler koddan önce başarısız olmalı: geçiyorlarsa isteneni (ya da hatayı) yakalamıyorlar.
+        if (yesil || zamanAsimi) {
+          bulgular.push(`### ${v.ad}: ${yesil ? "YEŞİL (kırmızı bekleniyordu)" : "SÜRE AŞIMI"}\nKomut: \`${v.komut}\`\n` + (yesil
+            ? "Yeni testler kod yazılmadan önce başarısız olmalı; şu an bütün testler geçiyor, yani yeni test isteneni (ya da hatayı) yakalamıyor. " +
+              "Testi, bugünkü kodda doğru sebeple başarısız olacak biçimde düzelt."
+            : `Testler süre sınırında bitmedi.\n\`\`\`\n${kuyruk(cikti, 2000)}\n\`\`\``));
+          return [bulgular, "ok"];
+        }
+        this.kirmiziCiktilar.set(`${fid}/${asama.id}`, kuyruk(cikti, 2500));
+        continue;
+      }
       if (!yesil) {
         bulgular.push(`### ${v.ad}: KIRMIZI\nKomut: \`${v.komut}\`\n\`\`\`\n${kuyruk(cikti, 3500)}\n\`\`\``);
         return [bulgular, "ok"];   // kırmızı koda onay kurulu harcanmaz
@@ -1034,7 +1254,7 @@ export class Orkestrator {
     const denetimler: { ad: string; sessiz?: boolean; calis: () => { ozet?: string; hatalar?: string[] } }[] = [];
     for (const v of asama.dogrulama.filter((x) => x.tip === "plan")) {
       denetimler.push({ ad: v.ad, calis: () => {
-        const p = planCikar(belge(), v.gelistiriciler);
+        const p = planCikar(belge(), this.planGelistiricileri(fid, v.gelistiriciler));
         return p.kalemler ? { ozet: `${p.kalemler.length} kalem: ${p.kalemler.map((k) => k.id).join(" → ")}` } : { hatalar: p.hatalar };
       } });
     }
@@ -1046,7 +1266,7 @@ export class Orkestrator {
     }
     for (const v of asama.dogrulama.filter((x) => x.tip === "atif")) {
       denetimler.push({ ad: v.ad, calis: () => {
-        const r = atiflariDenetle(belge(), path.join(this.calisma, fid, "kod"));
+        const r = atiflariDenetle(belge(), path.join(this.calisma, fid, "kod"), this.depo.fikir(fid)?.proje ? [PROJE_KLASORU, KAYNAK_KLASORU] : [KAYNAK_KLASORU]);
         return r.hatalar.length ? { hatalar: r.hatalar.slice(0, 12) } : { ozet: `${r.gecerli} atıf, hepsi gerçek dosya ve satırlara gidiyor` };
       } });
     }
@@ -1058,6 +1278,21 @@ export class Orkestrator {
         // Kısmi belge yürürlükte kalmasın: önceki tam sürüm geri konur (kısmi olan _surumler'de durur), sonraki tur onu temel alır
         fs.writeFileSync(path.join(this.calisma, fid, "belgeler", `${asama.cikti}.md`), onceki.trimEnd() + "\n", "utf8");
         return { hatalar: [...r.hatalar, "Önceki sürüm yeniden yürürlüğe kondu; düzeltmeyi onun üzerine yap."] };
+      } });
+    }
+    if (this.ozetIstenir(this.depo.fikir(fid)!, asama)) {
+      denetimler.push({ ad: "Karar özeti", sessiz: true, calis: () => {
+        const r = ozetCikar(belge());
+        return r.maddeler ? { ozet: `${r.maddeler.length} madde` } : { hatalar: r.hatalar };
+      } });
+    }
+    if (asama.tur === "kesif") {
+      denetimler.push({ ad: "İş önerisi", calis: () => {
+        const r = isCikar(belge());
+        if (!r.is) return { hatalar: r.hatalar };
+        const yok = this.olmayanYollar(fid, r.is);
+        return yok.length ? { hatalar: yok }
+          : { ozet: `${IS_TURLERI[r.is.tur]}, ${IS_BOYUTLARI[r.is.boyut]}; ${Object.entries(r.is.taraflar).map(([t, a]) => `${t}: ${a.yazma_alani.length} yol`).join(", ")}` };
       } });
     }
     if (asama.tur === "gelisim") {
@@ -1077,7 +1312,7 @@ export class Orkestrator {
     return null;
   }
 
-  private async komutKos(fid: string, asama: Asama, v: Dogrulayici, tur: number): Promise<[boolean | null, string]> {
+  private async komutKos(fid: string, asama: Asama, v: Dogrulayici, tur: number): Promise<[boolean | null, string, boolean]> {
     const d = path.join(this.calisma, fid);
     const adim = this.depo.adimEkle({ fikir_id: fid, asama_id: asama.id, asama_ad: asama.ad, tip: "kontrol", ajan: "-", ajan_ad: v.ad, tur, deneme: 1, durum: "calisiyor", motor: "sistem", model: null });
     const kaydet = this.surecKaydedici(fid);
@@ -1085,13 +1320,17 @@ export class Orkestrator {
     const { kod, cikti, zamanAsimi } = await new Promise<{ kod: number; cikti: string; zamanAsimi: boolean }>((coz) => {
       let cikti = "";
       let zamanAsimi = false;
-      const p = spawn("bash", ["-c", v.komut!], { cwd: path.join(d, "kod"), detached: true, stdio: ["ignore", "pipe", "pipe"] });
+      const p = spawn("bash", ["-c", v.komut!], { cwd: path.join(d, "kod", v.dizin ?? ""), detached: true, stdio: ["ignore", "pipe", "pipe"] });
       kaydet(p, false);
       p.stdout!.setEncoding("utf8").on("data", (x) => { cikti += x; });
       p.stderr!.setEncoding("utf8").on("data", (x) => { cikti += x; });
       const saat = setTimeout(() => { zamanAsimi = true; sureciOldur(p); }, v.sure_dk * 60_000);
       p.on("error", (e) => { clearTimeout(saat); kaydet(p, true); coz({ kod: -1, cikti: `Komut çalıştırılamadı: ${e.message}`, zamanAsimi: false }); });
-      p.on("close", (k) => { clearTimeout(saat); kaydet(p, true); coz({ kod: k ?? -1, cikti: zamanAsimi ? `${cikti}\n(süre sınırı aşıldı: ${v.sure_dk} dk)` : cikti, zamanAsimi }); });
+      p.on("close", (k) => {
+        clearTimeout(saat); kaydet(p, true);
+        cikti = cikti.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");   // test koşucularının renk kodları özete ve ajana giden bulguya karışmasın
+        coz({ kod: k ?? -1, cikti: zamanAsimi ? `${cikti}\n(süre sınırı aşıldı: ${v.sure_dk} dk)` : cikti, zamanAsimi });
+      });
     });
     const sure = Math.round((Date.now() - t0) / 100) / 10;
     const yol = `gunluk/adim-${adim}-kontrol.txt`;
@@ -1099,11 +1338,14 @@ export class Orkestrator {
     if (this.durdurIstekleri.has(fid)) {
       this.depo.adimGuncelle(fid, adim, { durum: "durduruldu", bitis: simdi(), sure_sn: sure, ozet: "Kullanıcı durdurdu", dosya: yol });
       this.durdurUygula(fid);
-      return [null, cikti];
+      return [null, cikti, false];
     }
     const yesil = kod === 0;
-    this.depo.adimGuncelle(fid, adim, { durum: yesil ? "yesil" : zamanAsimi ? "takildi" : "kirmizi", bitis: simdi(), sure_sn: sure, ozet: testOzeti(cikti, kod), dosya: yol });
-    return [yesil, cikti];
+    // Kırmızı beklenen denetimde (koddan önceki test) geçme ölçütü tersidir; zaman çizelgesinde de öyle görünür.
+    const gecti = v.beklenen === "kirmizi" ? !yesil && !zamanAsimi : yesil;
+    const onek = v.beklenen !== "kirmizi" ? "" : gecti ? "Beklendiği gibi kırmızı · " : yesil ? "Yeşil; kırmızı bekleniyordu · " : "";
+    this.depo.adimGuncelle(fid, adim, { durum: gecti ? "yesil" : zamanAsimi ? "takildi" : "kirmizi", bitis: simdi(), sure_sn: sure, ozet: onek + testOzeti(cikti, kod), dosya: yol });
+    return [yesil, cikti, zamanAsimi];
   }
 
   private async incele(fid: string, asama: Asama, v: Dogrulayici, tur: number): Promise<IncelemeSonucu> {
@@ -1113,7 +1355,7 @@ export class Orkestrator {
     const model = this.incelemeModeli(motor, kart);
     const dizinModu = asama.calisma_dizini === "kod";
     // Replatformda okuma araçları olan onaycı (MSA) belge aşamalarında da eski kodu açıp atıfları doğrulayabilir
-    const kaynakOkur = !dizinModu && Boolean(f.kaynak) && kart.araclar.includes("Read");
+    const kaynakOkur = !dizinModu && Boolean(f.kaynak || f.proje) && kart.araclar.includes("Read");
     const cwd = path.join(this.calisma, fid, dizinModu || kaynakOkur ? "kod" : "belgeler");
     const istem = this.incelemeIstemi(fid, asama, v, tur, dizinModu, kaynakOkur);
     const sistem = [kart.govde.trim(), ORTAK_KURALLAR, INCELEME_KURALLARI, v.atlanabilir ? KAPSAM_KURALI : "", this.soruKurallari(f, true, asama)].filter(Boolean).join("\n\n");
@@ -1197,8 +1439,9 @@ export class Orkestrator {
 
   /** Replatform fikrinde her üretim istemine: işin bir yeniden yazım olduğu, eski davranışın nerede yazılı olduğu, kaynakların yeri. */
   private mevcutSistemBolumu(fid: string, asama: Asama, dizinModu: boolean): string[] {
-    const kaynak = this.depo.fikir(fid)?.kaynak;
-    if (!kaynak) return [];
+    const f = this.depo.fikir(fid);
+    const kaynak = f?.kaynak;
+    if (!kaynak || f?.proje) return [];   // mevcut projede kaynak/ eklerdir; projeBolumu anlatır
     const p = ["", "## Mevcut sistem", "Bu iş bir replatform: var olan bir sistem yeniden yazılıyor."];
     if (asama.cikti !== "mevcut-sistem") {
       p.push("Eski sistemin bugünkü davranışı \"mevcut-sistem\" belgesinde (koda atıflı); hangi eski kuralın (E1...) korunduğu, değiştiği ya da bırakıldığı hedef analizde. Çıktında eski kurallara bu kimliklerle bağlan.");
@@ -1209,10 +1452,33 @@ export class Orkestrator {
     return p;
   }
 
+  /** Mevcut proje işinde her isteme: işin var olan bir kod tabanında olduğu, türü, projenin ve eklerin yeri, test komutu kuralı. */
+  private projeBolumu(fid: string, asama: Asama, dizinModu: boolean): string[] {
+    const f = this.depo.fikir(fid);
+    if (!f?.proje) return [];
+    const is = this.isOku(fid);
+    const p = ["", "## Mevcut proje", "Bu iş var olan bir projede yapılıyor: sıfırdan ürün yazılmıyor, çalışan bir kod tabanına dokunuluyor."];
+    if (is) p.push(`İş: ${IS_TURLERI[is.tur]} (${IS_BOYUTLARI[is.boyut].toLocaleLowerCase("tr")}). ${TUR_REHBERI[is.tur]}`);
+    if (dizinModu) {
+      p.push(`Proje \`${PROJE_KLASORU}/\` altında (${f.proje.dosya_sayisi} dosya; dökümü "proje-envanteri" belgesinde). Projenin kendi yapısına, adlandırmasına, ` +
+        "stiline ve test çatısına uy; yeni bağımlılık ekleme, ilgisiz dosyayı yeniden biçimlendirme.");
+      if (f.kaynak) p.push(`Ekler (sözleşme, hata detayı, test senaryosu, analiz notu) \`${KAYNAK_KLASORU}/\` altında: salt okunur ve kilitli; dökümü "kaynak-envanteri" belgesinde.`);
+      if (is && !asama.salt_okunur) {
+        p.push(`Çalışma dizinin \`kod/\`, proje bir alt klasörde: komutları proje kökünü vererek çalıştır (\`mvn -f ${PROJE_KLASORU}/pom.xml ...\`, ` +
+          `\`gradle -p ${PROJE_KLASORU} ...\`, \`npm --prefix ${PROJE_KLASORU} ...\`). Sistem aşama sonunda proje kökünde şunu koşar: \`${is.test_komutu}\``);
+      }
+    }
+    return p;
+  }
+
   private uretimIstemi(fid: string, asama: Asama, geriBildirim: string | null, dizinModu: boolean): string {
     const p = [`# Görev: ${asama.ad}`, "", asama.gorev || "-", ...(asama.kalem ? this.kalemBolumu(fid, asama) : []), ...this.mevcutSistemBolumu(fid, asama, dizinModu),
-      ...this.kararBolumu(fid), "", "## Girdiler"];
-    for (const g of asama.girdiler) p.push("", `### ${g}`, this.belgeOku(fid, g) || "(bu belge henüz yok)");
+      ...this.projeBolumu(fid, asama, dizinModu), ...this.kararBolumu(fid), "", "## Girdiler"];
+    const proje = Boolean(this.depo.fikir(fid)?.proje);
+    for (const g of asama.girdiler) {
+      const b = this.belgeOku(fid, g);
+      if (b || !proje) p.push("", `### ${g}`, b || "(bu belge henüz yok)");   // mevcut projede: bu işte koşmayan aşamanın belgesi sessizce düşer
+    }
     if (dizinModu) {
       const kilitli = this.kilitOku(fid).yollar;
       const dosyalar = this.kodDosyalari(fid);
@@ -1222,7 +1488,8 @@ export class Orkestrator {
       if (kilitli.length) p.push("KİLİTLİ (yalnızca okunur; değiştirirsen sistem geri alır ve ihlal olarak kaydeder): " + kilitli.map((k) => `\`${k}\``).join(", "));
       const adrler = this.adrOku(fid);
       if (adrler.length && kilitli.includes(ADR_KLASORU)) p.push(`MİMARİ KARARLAR \`${ADR_KLASORU}/\` altında (${adrler.map((x) => x.id).join(", ")}): koda başlamadan oku ve uy. Bir karar işini engelliyorsa kodu bükme; bunu belgende söyle.`);
-      if (!asama.salt_okunur) p.push("Mevcut dosyalar: " + (dosyalar.length ? dosyalar.slice(0, 80).map((x) => `\`${x}\``).join(", ") : "(boş)"));
+      if (!asama.salt_okunur) p.push(proje ? `Proje dosyaları \`${PROJE_KLASORU}/\` altında; Glob ve Grep ile gez (dökümü "proje-envanteri" belgesinde).`
+        : "Mevcut dosyalar: " + (dosyalar.length ? dosyalar.slice(0, 80).map((x) => `\`${x}\``).join(", ") : "(boş)"));
     }
     if (geriBildirim) {
       const onceki = asama.cikti ? this.belgeOku(fid, asama.cikti) : "";
@@ -1246,24 +1513,31 @@ export class Orkestrator {
     const yazar = this.kartlar.get(asama.ajan!)!;
     const p = [`# İnceleme: ${asama.ad} (tur ${tur})`, "", `Yazar: ${yazar.ad}. Bu onay kurulunda senin odağın:`,
       v.odak || "Çıktı, referans belgelerdeki gereksinimleri doğru ve eksiksiz karşılıyor mu?",
-      ...(asama.kalem ? this.kalemBolumu(fid, asama) : []), ...this.kararBolumu(fid), ""];
+      ...(asama.kalem ? this.kalemBolumu(fid, asama) : []), ...this.projeBolumu(fid, asama, dizinModu || kaynakOkur), ...this.kararBolumu(fid), ""];
+    const proje = Boolean(this.depo.fikir(fid)?.proje);
+    const kodYeri = proje ? `\`${PROJE_KLASORU}/\` altındaki kodla (ve varsa \`${KAYNAK_KLASORU}/\` altındaki eklerle)` : `\`${KAYNAK_KLASORU}/\` altındaki kodla`;
     if (asama.salt_okunur) {
       p.push("## İncelenen belge", `### ${asama.cikti}`, this.belgeOku(fid, asama.cikti) || "(boş)", "",
-        `Belgedeki iddiaları \`${KAYNAK_KLASORU}/\` altındaki kodla Read, Glob ve Grep kullanarak karşılaştır. Dosya değiştiremezsin.`, DOSYA_ERISIMI);
+        `Belgedeki iddiaları ${kodYeri} Read, Glob ve Grep kullanarak karşılaştır. Dosya değiştiremezsin.`, DOSYA_ERISIMI);
     } else if (dizinModu) {
       p.push("## İncelenen", "Çalışma dizinindeki (`kod/`) dosyaları Read, Glob ve Grep ile oku. Dosya değiştiremezsin.", DOSYA_ERISIMI);
       if (asama.yazabilir.length) p.push("Yazarın yazma alanı: " + asama.yazabilir.map((y) => `\`${klasorGibi(y)}\``).join(", "));
       p.push("", "### Yazarın özeti", this.belgeOku(fid, asama.cikti) || "-");
       const sonTest = this.depo.adimlar(fid).filter((s) => s.asama_id === asama.id && s.tip === "kontrol").at(-1);
       if (sonTest) p.push("", "### Son test sonucu", sonTest.ozet || "-");
+      const kirmizi = this.kirmiziCiktilar.get(`${fid}/${asama.id}`);
+      if (kirmizi) p.push("", "### Test çıktısı (kod yazılmadan önce; kırmızı olması bekleniyor)", "Doğru sebeple mi kırmızı: derleme hatası ya da eksik bağımlılık değil, beklenen davranışın henüz olmaması mı?", "```", kirmizi, "```");
     } else {
       p.push("## İncelenen belge", `### ${asama.cikti}`, this.belgeOku(fid, asama.cikti) || "(boş)");
       if (kaynakOkur) {
-        p.push("", `Eski sistemin kodu \`${KAYNAK_KLASORU}/\` altında: belgelerdeki atıfları gerekirse Read, Glob ve Grep ile kodda doğrula. Dosya değiştiremezsin.`, DOSYA_ERISIMI);
+        p.push("", `${proje ? `Projenin kodu \`${PROJE_KLASORU}/\`` : `Eski sistemin kodu \`${KAYNAK_KLASORU}/\``} altında: belgelerdeki atıfları gerekirse Read, Glob ve Grep ile kodda doğrula. Dosya değiştiremezsin.`, DOSYA_ERISIMI);
       }
     }
     p.push("", "## Referans belgeler");
-    for (const g of asama.girdiler) p.push("", `### ${g}`, this.belgeOku(fid, g) || "(yok)");
+    for (const g of asama.girdiler) {
+      const b = this.belgeOku(fid, g);
+      if (b || !proje) p.push("", `### ${g}`, b || "(yok)");   // mevcut projede: bu işte koşmayan aşamanın belgesi sessizce düşer
+    }
     p.push("", "## Kararın", 'Yalnızca JSON döndür: {"karar": "ONAY" | "DUZELT" | "SORU", "gerekce": "...", "bulgular": ["..."], "sorular": []' +
       (v.atlanabilir ? ', "kapsam_disi": false' : "") + "}");
     return p.join("\n");
@@ -1461,23 +1735,27 @@ export class Orkestrator {
       faz = "dogrula";
       this.sistemAdimi(fid, a, "Yeniden doğrulama", "yeniden", "Önceki çıktı korunuyor; yalnızca testler ve onay kurulu yeniden bakıyor.");
     }
-    return { asama_idx: sonraki, tur: 1, faz, ek_tur: 0, soru_turu: 0, onaylayanlar: [], geri_bildirim: null };
+    return { asama_idx: sonraki, tur: 1, faz, ek_tur: 0, soru_turu: 0, onaylayanlar: [], birader_veto: 0, geri_bildirim: null };
   }
 
   private bekleyeAl(fid: string, asama: Asama | null, sebep: BeklemeSebebi, mesaj: string, sec: Secenek[], detay: string | null = null,
     ek: Partial<Bekleme> = {}): "bekle" {
+    // Keşif atlanamaz ve bulgulara rağmen geçilemez: onaylanmış iş önerisi olmadan sonraki aşamalar çalışamaz.
+    if (asama?.tur === "kesif") sec = sec.filter((x) => x.anahtar !== "atla" && x.anahtar !== "devam");
     const adim = this.sistemAdimi(fid, asama, sebep === "ajan_sorusu" ? "Ajan sorusu" : "Seni bekliyor", "bekliyor", mesaj, false);
     const b: Bekleme = { sebep, asama_id: asama?.id ?? null, asama_ad: asama?.ad ?? null, mesaj, secenekler: sec, detay, adim_id: adim, zaman: simdi(), ...ek };
     if (sec.some((s) => s.anahtar === "geri_gonder") && asama) {
       const f = this.depo.fikir(fid)!;
       const asamalar = this.asamalar(f);
       const idx = asamalar.findIndex((a) => a.id === asama.id);
-      const onceki = asamalar.slice(0, idx < 0 ? asamalar.length : idx).filter((a) => a.tur === "ajan");
+      const onceki = asamalar.slice(0, idx < 0 ? asamalar.length : idx).filter((a) => a.tur === "ajan" || a.tur === "kesif");
       b.geri_hedefler = onceki.map((a) => ({ id: a.id, ad: a.ad }));
       // Varsayılan: aşamanın geri_donus'u; yoksa son kod kalemi (teslimdeki notlar çoğunlukla davranışla ilgilidir); yoksa son aşama.
       const gelistiriciler = new Set(this.akislar.get(f.profil)!.asamalar.flatMap((a) => Object.keys(a.gelistiriciler)));
-      const sonKod = onceki.filter((a) => a.kalem && a.ajan && gelistiriciler.has(a.ajan)).at(-1);
-      b.varsayilan_hedef = asama.geri_donus ?? sonKod?.id ?? b.geri_hedefler.at(-1)?.id ?? null;
+      // (a.taraf: mevcut projede kalem dışındaki yazılımcı aşaması, ör. küçük işte Düzeltme)
+      const sonKod = onceki.filter((a) => (a.kalem || a.taraf) && a.ajan && gelistiriciler.has(a.ajan)).at(-1);
+      const geriDonus = asama.geri_donus && onceki.some((a) => a.id === asama.geri_donus) ? asama.geri_donus : null;
+      b.varsayilan_hedef = geriDonus ?? sonKod?.id ?? b.geri_hedefler.at(-1)?.id ?? null;
     }
     this.depo.fikirGuncelle(fid, { durum: "bekliyor", bekleme: b });
     return "bekle";
@@ -1491,11 +1769,14 @@ export class Orkestrator {
   private sorulariSor(fid: string, asama: Asama, sorular: AjanSorusu[], kaynak: BeklemeKaynagi, bekleyenGeriBildirim: string | null = null,
     detay: string | null = null, ekipKararlari: Karar[] = []): "bekle" {
     const kimler = [...new Set(sorular.map((s) => s.soran_ad))].join(", ");
-    const mesaj = kaynak === "gelisim" ? `${kimler} ${sorular.length} gelişim önerisi getirdi. Sence hangileri olmalı?`
+    const mesaj = kaynak === "kapi" ? `${asama.ad} hazır: onay kurulu geçirdi. Bu aşamada alınan kararları onayla ya da değiştir.`
+      : kaynak === "kesif" ? `${kimler} projeyi inceledi ve iş önerisini çıkardı. Onayla ya da düzelt.`
+      : kaynak === "gelisim" ? `${kimler} ${sorular.length} gelişim önerisi getirdi. Sence hangileri olmalı?`
       : sorular.some((s) => s.oylar?.length) ? `Ekip anlaşamadı; ${kimler} devam etmek için kararını soruyor.`
         : `${kimler} devam etmek için kararını soruyor.`;
     return this.bekleyeAl(fid, asama, "ajan_sorusu", mesaj, [], detay, {
-      sorular: sorular.slice(0, 5), kaynak, bekleyen_geri_bildirim: bekleyenGeriBildirim,
+      sorular: kaynak === "kapi" ? sorular : sorular.slice(0, 5), kaynak, bekleyen_geri_bildirim: bekleyenGeriBildirim,
+      ...(kaynak === "kapi" ? { birader: this.biraderDefteri(fid).filter((d) => d.asama_id === asama.id).at(-1) ?? null } : {}),
       ...(ekipKararlari.length ? { ekip_kararlari: ekipKararlari } : {}),
     });
   }
@@ -1719,13 +2000,465 @@ export class Orkestrator {
     return jsonOku<PlanKaydi | null>(this.planYolu(fid), null);
   }
 
-  /** Fikrin etkin aşamaları: teslim planı açıldıysa kalemler aşaması yerine kalemlerin somut aşamaları gelir. */
+  /** Fikrin etkin aşamaları: teslim planı açıldıysa kalemler aşaması yerine kalemlerin somut aşamaları gelir. Mevcut proje
+   *  işinde öneri kartı onaylandıysa aşamalar boyuta ve tarafa göre süzülür, karttaki yer tutucular dolar. */
   private asamalar(f: Fikir): Asama[] {
     const akis = this.akislar.get(f.profil);
     if (!akis) return [];
-    if (!akis.asamalar.some((a) => a.tur === "kalemler")) return akis.asamalar;
-    const plan = this.planOku(f.id);
-    return akis.asamalar.flatMap((a) => (a.tur === "kalemler" && plan && plan.belge === a.plan ? kalemleriGenislet(a, plan.kalemler, plan.surum) : [a]));
+    const is = akis.kaynak === "proje" ? this.isOku(f.id) : null;
+    let liste = is ? akis.asamalar.filter((a) => kosulTutar(a.kosul, is)) : akis.asamalar;
+    if (liste.some((a) => a.tur === "kalemler")) {
+      const plan = this.planOku(f.id);
+      liste = liste.flatMap((a) => (a.tur === "kalemler" && plan && plan.belge === a.plan ? kalemleriGenislet(a, plan.kalemler, plan.surum) : [a]));
+    }
+    return is ? liste.map((a) => isUygula(a, is)) : liste;
+  }
+
+  // ------------------------------ Büyük Birader ------------------------------
+  /** Bu fikirde Büyük Birader çalışır mı: ayarda açık, akışta kapatılmamış. */
+  private biraderAcik(f: Fikir): boolean {
+    return this.cfg.buyuk_birader.acik && (this.akislar.get(f.profil)?.buyuk_birader ?? false) && this.kartlar.has(BIRADER);
+  }
+
+  /** Bu aşamaya bakar mı: ajan ve keşif aşamaları (kalem adımları dahil); kontrol, insan ve gelişim aşamalarına bakmaz. */
+  private biraderBakar(f: Fikir, asama: Asama): boolean {
+    return this.biraderAcik(f) && (asama.tur === "ajan" || asama.tur === "kesif") && Boolean(asama.ajan && this.kartlar.has(asama.ajan));
+  }
+
+  biraderDefteri(fid: string): BiraderDegerlendirmesi[] {
+    return jsonOku<BiraderDegerlendirmesi[]>(path.join(this.calisma, fid, ".kovan", "birader.json"), []);
+  }
+
+  private biraderYaz(fid: string, kayitlar: BiraderDegerlendirmesi[]): void {
+    const d = path.join(this.calisma, fid);
+    atomikYaz(path.join(d, ".kovan", "birader.json"), JSON.stringify(kayitlar, null, 2));
+    const md = ["# Büyük Birader'in defteri", "", "Her aşamanın sonunda işin tamamına bakıp verdiği hükümler. VETO aşamayı yazarına geri gönderir; DİKKAT durdurmaz.", ""];
+    for (const k of kayitlar) {
+      md.push(`## ${k.asama_ad}, tur ${k.tur}: ${HUKUM_ADI[k.hukum]}${k.dusuruldu ? " (kanıtsız veto, düşürüldü)" : ""}`, `*${k.zaman}*`, "", k.ozet || "-");
+      for (const b of k.bulgular) md.push(`- **${b.konu}**: ${b.aciklama}${b.kanit ? ` (kanıt: ${b.kanit})` : ""}`);
+      if (k.oneri) md.push("", `Öneri: ${k.oneri}`);
+      md.push("");
+    }
+    atomikYaz(path.join(d, "belgeler", "birader-defteri.md"), md.join("\n"));
+  }
+
+  /** Aşama başına gidişat: tur, düzeltme isteği, sınır ihlali, izin reddi, son denetim. Büyük Birader'in isteminde tablo olur. */
+  private gidisat(fid: string): string[] {
+    const adimlar = this.depo.adimlar(fid);
+    const sira: string[] = [];
+    for (const s of adimlar) if (s.asama_id !== "-" && !sira.includes(s.asama_id)) sira.push(s.asama_id);
+    const satirlar = ["| Aşama | Üretim turu | Düzeltme isteği | Sınır ihlali | İzin reddi | Son denetim |", "|---|---|---|---|---|---|"];
+    for (const id of sira) {
+      const a = adimlar.filter((s) => s.asama_id === id);
+      const say = (kosul: (s: Adim) => boolean) => a.filter(kosul).length;
+      const kontrol = a.filter((s) => s.tip === "kontrol").at(-1);
+      satirlar.push(`| ${a[0].asama_ad} | ${say((s) => s.tip === "uret" && s.durum === "tamam")} | ${say((s) => s.tip === "inceleme" && s.durum === "duzelt")} | ` +
+        `${say((s) => s.ajan_ad === "Sınır ihlali")} | ${say((s) => s.ajan_ad === "İzin reddi")} | ${kontrol ? `${kontrol.ajan_ad}: ${kisalt(kontrol.ozet, 60)}` : "-"} |`);
+    }
+    return satirlar;
+  }
+
+  private biraderIstemi(fid: string, asama: Asama, tur: number): string {
+    const f = this.depo.fikir(fid)!;
+    const yazar = this.kartlar.get(asama.ajan!)!;
+    const p = [`# Değerlendirme: ${asama.ad} (tur ${tur})`, "", `Yazar: ${yazar.ad}. Onay kurulu bu aşamayı geçirdi. İşin tamamına bakarak hükmünü ver.`,
+      "", "## Fikir", this.belgeOku(fid, "fikir") || f.metin, ...this.kararBolumu(fid), "", "## Gidişat", ...this.gidisat(fid)];
+    // Önceki aşamalar: karar özetleri (belgenin tamamı için dosyayı aç)
+    const onceki = this.asamalar(f).slice(0, f.asama_idx).filter((a) => a.cikti && (a.tur === "ajan" || a.tur === "kesif"));
+    const ozetler: string[] = [];
+    for (const a of onceki) {
+      const maddeler = ozetCikar(this.belgeOku(fid, a.cikti)).maddeler;
+      if (!maddeler) continue;
+      ozetler.push(`### ${a.ad} (belgeler/${a.cikti}.md)`, ...maddeler.map((m) => `- ${m.baslik}: ${m.karar}`));
+    }
+    if (ozetler.length) p.push("", "## Önceki aşamaların karar özetleri", ...ozetler);
+    const onaylar = this.onaylar(fid);
+    if (onaylar.length) p.push("", "## Projenin sahibinin onayladığı aşamalar", onaylar.map((o) => o.asama_ad).join(", "));
+    const defter = this.biraderDefteri(fid).slice(-8);
+    if (defter.length) p.push("", "## Önceki değerlendirmelerin", ...defter.map((d) => `- ${d.asama_ad}, tur ${d.tur}: ${HUKUM_ADI[d.hukum]}. ${kisalt(d.ozet, 300)}`));
+    const belge = this.belgeOku(fid, asama.cikti);
+    p.push("", `## Bu aşamanın çıktısı (belgeler/${asama.cikti}.md)`,
+      belge.length > EN_UZUN_BELGE ? `${belge.slice(0, EN_UZUN_BELGE)}\n\n(belge uzun; devamını dosyadan oku)` : belge || "(boş)");
+    p.push("", "## Dosyalar", "Çalışma dizinin fikrin klasörü. `belgeler/` bütün aşamaların belgeleri, `incelemeler/` onay kurulunun kararları, `kod/` ürün" +
+      (f.proje ? " (`kod/proje/` üzerinde çalışılan proje, `kod/kaynak/` ekler)" : f.kaynak ? " (`kod/kaynak/` eski sistem)" : "") +
+      ". Şüphelendiğin yeri Read, Glob ve Grep ile aç; dosya değiştiremezsin.", DOSYA_ERISIMI,
+      "", "## Hükmün", 'Yalnızca JSON döndür: {"hukum": "UYGUN" | "DIKKAT" | "VETO", "ozet": "...", "bulgular": [{"konu": "...", "kanit": "...", "aciklama": "..."}], "oneri": "..."}');
+    return p.join("\n");
+  }
+
+  /** Onay kurulu geçtikten sonra Büyük Birader'in hükmü. veto: aşama bulguyla yazarına döner; bekle: karar sana geldi. */
+  private async biraderDegerlendir(fid: string, asama: Asama, tur: number): Promise<{ sonuc: "ok" | "veto" | "bekle" | "dur"; bulgu?: string }> {
+    const f = this.depo.fikir(fid)!;
+    if (!this.biraderBakar(f, asama) || f.istisnalar?.[`birader:${asama.id}`]) return { sonuc: "ok" };
+    if (this.durdurIstekleri.has(fid)) { this.durdurUygula(fid); return { sonuc: "dur" }; }
+    if (this.butceAsildi(fid)) return { sonuc: this.butceBeklemesi(fid, asama) };
+    const kart = this.kartlar.get(BIRADER)!;
+    const motor = this.motorSec(f, kart);
+    const model = motor.modelSec(kart);   // ucuz inceleme modeli Büyük Birader'e uygulanmaz
+    const istem = this.biraderIstemi(fid, asama, tur);
+    const sistem = [kart.govde.trim(), ORTAK_KURALLAR].join("\n\n");
+    let son: AjanSonucu | null = null;
+    for (let deneme = 1; deneme <= this.cfg.deneme_sayisi; deneme++) {
+      const adim = this.depo.adimEkle({ fikir_id: fid, asama_id: asama.id, asama_ad: asama.ad, tip: "inceleme", ajan: kart.id, ajan_ad: kart.ad, tur, deneme, durum: "calisiyor", motor: motor.ad, model });
+      const cagri: AjanCagrisi = {
+        rol: kart.id, asama_id: asama.id, gorev_turu: "inceleme", sistem, istem, model, araclar: ["Read", "Glob", "Grep"], izinli: [],
+        cwd: path.join(this.calisma, fid), sure_sn: kart.sure_dk * 60, sistem_modu: "ekle", butce_usd: kart.butce_usd, sema: BIRADER_SEMASI, efor: kart.efor,
+        surecCb: this.surecKaydedici(fid),
+      };
+      son = await motor.calistir(cagri);
+      const gunluk = this.gunlukYaz(fid, adim, motor, cagri, son);
+      this.depo.maliyetEkle(fid, son.maliyet, son.girdi_token, son.cikti_token);
+      if (this.durdurIstekleri.has(fid)) { this.adimKapat(fid, adim, "durduruldu", son, "Kullanıcı durdurdu", gunluk); this.durdurUygula(fid); return { sonuc: "dur" }; }
+      const ham = (son.yapisal ?? jsonCikar(son.metin)) as Record<string, unknown> | null;
+      const hukumHam = String(ham?.hukum ?? "").toLocaleUpperCase("tr").replace(/İ/g, "I").trim();
+      if (son.ok && ham && (hukumHam === "UYGUN" || hukumHam === "DIKKAT" || hukumHam === "VETO")) {
+        const metin = (v: unknown) => (v === undefined || v === null ? "" : String(v)).trim();
+        const bulgular: BiraderBulgusu[] = (Array.isArray(ham.bulgular) ? ham.bulgular : []).slice(0, 6)
+          .map((x): Record<string, unknown> => (x && typeof x === "object" ? x as Record<string, unknown> : { aciklama: x }))
+          .map((x) => ({ konu: metin(x.konu) || "Bulgu", kanit: metin(x.kanit), aciklama: metin(x.aciklama) })).filter((x) => x.aciklama);
+        let hukum = hukumHam as BiraderHukmu;
+        // Kanıtsız veto geçersiz: dayanağı olmayan bulgu aşamayı geri çeviremez
+        const kanitli = bulgular.filter((x) => x.kanit.length >= 8);
+        const dusuruldu = hukum === "VETO" && !kanitli.length;
+        if (dusuruldu) hukum = "DIKKAT";
+        const kayit: BiraderDegerlendirmesi = { asama_id: asama.id, asama_ad: asama.ad, tur, hukum, ozet: metin(ham.ozet), bulgular, oneri: metin(ham.oneri), zaman: simdi(), ...(dusuruldu ? { dusuruldu: true } : {}) };
+        this.biraderYaz(fid, [...this.biraderDefteri(fid), kayit]);
+        const rel = `incelemeler/${asama.id}-tur${tur}-${kart.id}-adim${adim}.md`;
+        fs.writeFileSync(path.join(this.calisma, fid, rel), [`# Büyük Birader: ${asama.ad}, tur ${tur}`, "", `Hüküm: **${HUKUM_ADI[hukum]}**${dusuruldu ? " (kanıtsız veto, sistemce düşürüldü)" : ""}`, "",
+          kayit.ozet || "-", "", "## Bulgular", ...(bulgular.length ? bulgular.map((x) => `- **${x.konu}**: ${x.aciklama}${x.kanit ? ` (kanıt: ${x.kanit})` : ""}`) : ["- (yok)"]),
+          ...(kayit.oneri ? ["", "## Öneri", kayit.oneri] : [])].join("\n") + "\n", "utf8");
+        this.adimKapat(fid, adim, hukum === "VETO" ? "veto" : hukum === "DIKKAT" ? "uyari" : "onay", son,
+          `${HUKUM_ADI[hukum]}${bulgular.length ? ` · ${bulgular.length} bulgu` : ""} · ${kisalt(kayit.ozet, 160)}`, rel);
+        if (dusuruldu) this.sistemAdimi(fid, asama, "Kanıtsız veto", "uyari", "Büyük Birader veto etti ama hiçbir bulguya kanıt göstermedi; hüküm DİKKAT'e düşürüldü, aşama geri çevrilmedi.");
+        if (hukum !== "VETO") return { sonuc: "ok" };
+        const bulgu = `### Büyük Birader: VETO\nGerekçe: ${kayit.ozet}\n` + kanitli.map((x) => `- **${x.konu}**: ${x.aciklama} (kanıt: ${x.kanit})`).join("\n");
+        const veto = (f.birader_veto ?? 0) + 1;
+        if (veto > this.cfg.buyuk_birader.en_fazla_veto) {
+          // Tek modelin ısrarı akışı kilitlemesin: sınırdan sonra karar projenin sahibinde
+          this.depo.fikirGuncelle(fid, { faz: "uret", geri_bildirim: bulgu });
+          return { sonuc: this.bekleyeAl(fid, asama, "tur_siniri", `Büyük Birader '${asama.ad}' aşamasını ${veto}. kez veto etti (sınır ${this.cfg.buyuk_birader.en_fazla_veto}). ` +
+            "Onay kurulu aşamayı geçirmişti; nasıl ilerleyelim?", secenekler(["bir_tur_daha", "devam", "durdur"], "bir_tur_daha"), bulgu) };
+        }
+        this.depo.fikirGuncelle(fid, { birader_veto: veto });
+        return { sonuc: "veto", bulgu };
+      }
+      this.adimKapat(fid, adim, son.zaman_asimi ? "takildi" : "hata", son, son.hata ?? "Hüküm (UYGUN/DIKKAT/VETO) okunamadı", gunluk);
+      if (son.kalici_hata) break;
+      await this.tekrarOncesiBekle(motor, deneme);
+    }
+    // Değerlendirme alınamadı: akış kilitlenmez, karar sende
+    return { sonuc: this.bekleyeAl(fid, asama, "hata", `Büyük Birader '${asama.ad}' aşamasını değerlendiremedi: ${son?.hata || "hüküm okunamadı"}`,
+      secenekler(["tekrar_dene", "birader_atla", "durdur"], "tekrar_dene")) };
+  }
+
+  // ------------------------------ aşama sonu kapısı ------------------------------
+  private katilimCoz(ham: string | undefined): Katilim {
+    const v = (ham ?? "").trim();
+    if (!v) return this.cfg.katilim;
+    if (!(KATILIMLAR as readonly string[]).includes(v)) throw new KovanHatasi(`Bilinmeyen katılım: ${v} (${KATILIMLAR.join(", ")})`);
+    return v as Katilim;
+  }
+
+  /** Aşama sonu kapıları fikir ortasında da değiştirilebilir; sonraki aşama sonlarından itibaren geçerlidir. */
+  katilimDegistir(fid: string, katilim: string): void {
+    this.fikirAl(fid);
+    this.depo.fikirGuncelle(fid, { katilim: this.katilimCoz(katilim || "-") });
+  }
+
+  /** Bu aşamanın sonunda kapı açılır mı. Keşfin ve gelişimin kendi kartı vardır. */
+  private kapiEtkin(f: Fikir, asama: Asama): boolean {
+    if (asama.tur !== "ajan") return false;
+    const k = f.katilim ?? "sonda";
+    return k === "her_asama" || (k === "planlama" && asama.kapi);
+  }
+
+  /** Çıktının sonunda karar özeti istenir mi: kapı açılacaksa ya da Büyük Birader aşamaları özetlerinden izleyecekse. */
+  private ozetIstenir(f: Fikir, asama: Asama): boolean {
+    return asama.tur === "ajan" && (this.kapiEtkin(f, asama) || this.biraderAcik(f));
+  }
+
+  /** Onaydan (ya da kapısız aşamada onay kurulundan) sonra: kilitler ve mimari karar kayıtları. */
+  private asamaTamamla(fid: string, asama: Asama): void {
+    if (asama.kilitle.length) this.kilitle(fid, asama);
+    if (asama.dogrulama.some((v) => v.tip === "adr")) this.adrYaz(fid, asama);
+  }
+
+  onaylar(fid: string): OnayKaydi[] {
+    return jsonOku<OnayKaydi[]>(path.join(this.calisma, fid, ".kovan", "onaylar.json"), []);
+  }
+
+  private belgeOzeti(fid: string, asama: Asama): string {
+    return crypto.createHash("sha256").update(this.belgeOku(fid, asama.cikti)).digest("hex");
+  }
+
+  /** Belge son onaydan beri değişmediyse kapı yeniden açılmaz (geri gönderme sonrası yeniden doğrulama). */
+  private kapiOnayli(fid: string, asama: Asama): boolean {
+    return this.onaylar(fid).some((o) => o.asama_id === asama.id && o.belge_ozeti === this.belgeOzeti(fid, asama));
+  }
+
+  private onayYaz(fid: string, asama: Asama, maddeler: OnayKaydi["maddeler"]): void {
+    const d = path.join(this.calisma, fid);
+    const kayitlar = [...this.onaylar(fid).filter((o) => o.asama_id !== asama.id),
+      { asama_id: asama.id, asama_ad: asama.ad, zaman: simdi(), belge_ozeti: this.belgeOzeti(fid, asama), maddeler }];
+    atomikYaz(path.join(d, ".kovan", "onaylar.json"), JSON.stringify(kayitlar, null, 2));
+    const md = ["# Onayların", "", "Aşama sonu kapılarında onayladığın kararlar. Değiştirdiklerin karar defterinde (Kararlar).", ""];
+    for (const o of kayitlar) md.push(`## ${o.asama_ad}`, `*${o.zaman}*`, "", ...(o.maddeler.length ? o.maddeler.map((m) => `- **${m.baslik}**: ${m.karar}`) : ["- Belgenin geneli"]), "");
+    atomikYaz(path.join(d, "belgeler", "onaylar.md"), md.join("\n"));
+  }
+
+  /** Kapı kartı: karar özeti maddeleri, mimari kararlar (seçenekleriyle; seçim sende) ve belgenin geneli. */
+  private kapiSor(fid: string, asama: Asama): Sonuc {
+    const kart = this.kartlar.get(asama.ajan!)!;
+    const belge = this.belgeOku(fid, asama.cikti);
+    const ortak = { coklu: false, soran: kart.id, soran_ad: kart.ad, insan: true };
+    const onayla = { etiket: `${KAPI_ONAY} (Önerilen)`, aciklama: "Karar böyle kalsın." };
+    const degistir = { etiket: KAPI_DEGISTIR, aciklama: "Ne değişsin, aşağıya yaz; aşama notunla yeniden çalışır." };
+    const turAdi = { karar: "Karar", varsayim: "Varsayım", kapsam: "Kapsam" };
+    const sorular: AjanSorusu[] = (ozetCikar(belge).maddeler ?? []).map((m) => ({
+      ...ortak, baslik: kisalt(m.baslik, 70), soru: `${m.karar}\nNeden: ${m.neden}` + (m.alternatif ? `\nAlternatif: ${m.alternatif}` : ""),
+      neden: `${turAdi[m.tur]}: ${kart.ad} bu aşamada böyle karara bağladı.`, secenekler: [onayla, degistir], kapi: { tur: "ozet", madde_turu: m.tur },
+    }));
+    if (asama.dogrulama.some((v) => v.tip === "adr")) {
+      for (const a of adrCikar(belge).adrler ?? []) {
+        const onerilen = (o: { ad: string }) => sadeMetin(o.ad) === sadeMetin(a.karar);
+        sorular.push({
+          ...ortak, baslik: kisalt(`Mimari karar: ${a.baslik}`, 70), soru: `${a.baglam}\nMimarın gerekçesi: ${a.gerekce}\nSonuçları: ${a.sonuclar}`,
+          neden: "Mimari seçim senin: Mimar seçenekleri hazırladı ve birini önerdi.",
+          secenekler: [...a.secenekler].sort((x, y) => Number(onerilen(y)) - Number(onerilen(x)))
+            .map((o) => ({ etiket: o.ad + (onerilen(o) ? " (Önerilen)" : ""), aciklama: `Artı: ${o.arti} Eksi: ${o.eksi}` })),
+          kapi: { tur: "adr", oneri: a.karar },
+        });
+      }
+    }
+    sorular.push({ ...ortak, baslik: "Belgenin geneli", soru: "Yukarıdaki maddelerin dışında değişmesini istediğin bir şey var mı? Belgenin tamamı Belgeler altında.",
+      secenekler: [onayla, degistir], kapi: { tur: "genel" } });
+    return this.sorulariSor(fid, asama, sorular, "kapi");
+  }
+
+  // ------------------------------ ajanla konuşma ------------------------------
+  sohbetOku(fid: string): SohbetMesaji[] {
+    return jsonOku<SohbetMesaji[]>(path.join(this.calisma, fid, ".kovan", "sohbet.json"), []);
+  }
+
+  private sohbetYaz(fid: string, mesajlar: SohbetMesaji[]): void {
+    atomikYaz(path.join(this.calisma, fid, ".kovan", "sohbet.json"), JSON.stringify(mesajlar, null, 2));
+  }
+
+  /** Şu an kime soru sorulabilir: belgesi yazılmış her aşamanın ajanı ve (açıksa) Büyük Birader. */
+  private sohbetHedefleri(f: Fikir): FikirDetayi["sohbet_hedefleri"] {
+    const liste: FikirDetayi["sohbet_hedefleri"] = [];
+    for (const a of this.asamalar(f)) {
+      const kart = a.ajan ? this.kartlar.get(a.ajan) : undefined;
+      if (!kart || !a.cikti || (a.tur !== "ajan" && a.tur !== "kesif") || !this.belgeOku(f.id, a.cikti)) continue;
+      liste.push({ id: kart.id, ad: kart.ad, kisa: kart.kisaltma, asama_id: a.id, asama_ad: a.ad });
+    }
+    if (this.biraderAcik(f) && liste.length) {
+      const kart = this.kartlar.get(BIRADER)!;
+      liste.push({ id: kart.id, ad: kart.ad, kisa: kart.kisaltma, asama_id: null, asama_ad: null });
+    }
+    return liste;
+  }
+
+  /** Bir ajana (ya da Büyük Birader'e) soru sor. Cevap arka planda gelir; ajan hiçbir şeye yazamaz. */
+  sor(fid: string, hedef: string, asamaId: string | null, soru: string): number {
+    const f = this.fikirAl(fid);
+    soru = (soru ?? "").trim();
+    if (!soru) throw new KovanHatasi("Sorunu yaz.");
+    if (soru.length > 4000) throw new KovanHatasi("Soru en fazla 4.000 karakter olabilir.");
+    if (f.durum === "calisiyor" || f.durum === "sirada") throw new KovanHatasi("Fikir çalışırken soru sorulamaz; aşama bitince ya da fikri durdurunca sor.");
+    if (this.sohbetCalisan.has(fid)) throw new KovanHatasi("Önceki sorunun cevabı bekleniyor; gelince yenisini sor.");
+    const h = this.sohbetHedefleri(f).find((x) => x.id === hedef && (x.asama_id ?? null) === (hedef === BIRADER ? null : asamaId));
+    if (!h) throw new KovanHatasi("Bu ajana şu an soru sorulamaz: belgesi yazılmış bir aşamanın ajanını ya da Büyük Birader'i seç.");
+    if (this.butceAsildi(fid)) throw new KovanHatasi("Fikrin bütçesi doldu; soru sormak için önce bütçeyi artır.");
+    const mesajlar = this.sohbetOku(fid);
+    const mesaj: SohbetMesaji = { id: (mesajlar.at(-1)?.id ?? 0) + 1, asama_id: hedef === BIRADER ? asamaId : h.asama_id, hedef: h.id, hedef_ad: h.ad, soru, cevap: null, durum: "bekliyor", zaman: simdi(), karar: null };
+    this.sohbetYaz(fid, [...mesajlar, mesaj]);
+    this.sohbetCalisan.add(fid);
+    void this.sohbetYurut(fid, mesaj.id)
+      .catch((e) => this.sohbetGuncelle(fid, mesaj.id, { durum: "hata", cevap: `Soru cevaplanamadı: ${(e as Error).message}` }))
+      .finally(() => this.sohbetCalisan.delete(fid));
+    return mesaj.id;
+  }
+
+  private sohbetGuncelle(fid: string, id: number, alanlar: Partial<SohbetMesaji>): void {
+    this.sohbetYaz(fid, this.sohbetOku(fid).map((m) => (m.id === id ? { ...m, ...alanlar } : m)));
+  }
+
+  private async sohbetYurut(fid: string, id: number): Promise<void> {
+    const f = this.depo.fikir(fid)!;
+    const mesaj = this.sohbetOku(fid).find((m) => m.id === id)!;
+    const kart = this.kartlar.get(mesaj.hedef)!;
+    const asama = mesaj.asama_id ? this.asamalar(f).find((a) => a.id === mesaj.asama_id) ?? null : null;
+    const birader = kart.id === BIRADER;
+    // Salt okunur: Büyük Birader fikrin klasörünü, kod ya da kaynak gören ajan kod/ klasörünü okur; diğerleri araçsız
+    const kodOkur = !birader && kart.araclar.includes("Read") && (asama?.calisma_dizini === "kod" || Boolean(f.kaynak || f.proje));
+    const cwd = path.join(this.calisma, fid, birader ? "" : kodOkur ? "kod" : "belgeler");
+    const araclar = birader || kodOkur ? ["Read", "Glob", "Grep"] : [];
+    const motor = this.motorSec(f, kart);
+    const model = motor.modelSec(kart);
+    const onceki = this.sohbetOku(fid).filter((m) => m.id < id && m.hedef === mesaj.hedef && m.asama_id === mesaj.asama_id && m.durum === "tamam").slice(-4);
+    const belge = asama?.cikti ? this.belgeOku(fid, asama.cikti) : "";
+    const p = ["# Soru (projenin sahibinden)", "", mesaj.soru];
+    if (asama) p.push("", `## Bağlam: ${asama.ad}`, `### ${asama.cikti}`, belge.length > EN_UZUN_BELGE ? `${belge.slice(0, EN_UZUN_BELGE)}\n\n(belge uzun; kısaltıldı)` : belge || "(boş)");
+    if (birader) p.push("", "## Gidişat", ...this.gidisat(fid), "", "## Önceki değerlendirmelerin",
+      ...(this.biraderDefteri(fid).slice(-8).map((d) => `- ${d.asama_ad}, tur ${d.tur}: ${HUKUM_ADI[d.hukum]}. ${kisalt(d.ozet, 300)}`)), "",
+      "Çalışma dizinin fikrin klasörü: `belgeler/`, `incelemeler/`, `kod/`. Gerekirse Read, Glob ve Grep ile aç.", DOSYA_ERISIMI);
+    else if (kodOkur) p.push("", "Çalışma dizinin `kod/`: gerekirse dosyaları Read, Glob ve Grep ile aç. Dosya değiştiremezsin.", DOSYA_ERISIMI);
+    p.push(...this.kararBolumu(fid));
+    if (onceki.length) p.push("", "## Önceki konuşma", ...onceki.flatMap((m) => [`Soru: ${m.soru}`, `Cevabın: ${kisalt(m.cevap, 1500)}`, ""]));
+    p.push("", "## Cevabın", "Yalnızca cevabını yaz (markdown).");
+    const sistem = [kart.govde.trim(), ORTAK_KURALLAR, SOHBET_KURALLARI].join("\n\n");
+    const adim = this.depo.adimEkle({ fikir_id: fid, asama_id: asama?.id ?? "-", asama_ad: asama?.ad ?? "-", tip: "sohbet", ajan: kart.id, ajan_ad: kart.ad, tur: f.tur, deneme: 1, durum: "calisiyor", motor: motor.ad, model });
+    const cagri: AjanCagrisi = {
+      rol: kart.id, asama_id: asama?.id ?? "-", gorev_turu: "sohbet", sistem, istem: p.join("\n"), model, araclar, izinli: [], cwd, sure_sn: kart.sure_dk * 60,
+      sistem_modu: araclar.length ? "ekle" : kart.sistem_promptu, butce_usd: kart.butce_usd, sema: null, efor: kart.efor, surecCb: this.surecKaydedici(fid),
+    };
+    const son = await motor.calistir(cagri);
+    const gunluk = this.gunlukYaz(fid, adim, motor, cagri, son);
+    this.depo.maliyetEkle(fid, son.maliyet, son.girdi_token, son.cikti_token);
+    if (son.ok && son.metin.trim()) {
+      this.sohbetGuncelle(fid, id, { durum: "tamam", cevap: citAyikla(son.metin) });
+      this.adimKapat(fid, adim, "tamam", son, kisalt(`Soru: ${mesaj.soru}`, 200), gunluk);
+    } else {
+      this.sohbetGuncelle(fid, id, { durum: son.hata ? "hata" : "durduruldu", cevap: son.hata ? `Soru cevaplanamadı: ${son.hata}` : "Soru yarıda kesildi." });
+      this.adimKapat(fid, adim, son.zaman_asimi ? "takildi" : "hata", son, son.hata ?? "Cevap gelmedi", gunluk);
+    }
+  }
+
+  /** Konuşmadan çıkan sonucu karara bağla: senin yazdığın cümle deftere girer, sonraki bütün ajanlar görür. */
+  sohbetKarari(fid: string, id: number, metin: string): void {
+    this.fikirAl(fid);
+    metin = (metin ?? "").trim();
+    if (!metin) throw new KovanHatasi("Kararı bir cümleyle yaz.");
+    const mesaj = this.sohbetOku(fid).find((m) => m.id === id);
+    if (!mesaj || mesaj.durum !== "tamam") throw new KovanHatasi("Karara bağlanacak cevap bulunamadı.");
+    if (mesaj.karar) throw new KovanHatasi("Bu cevap zaten karara bağlandı.");
+    const asama = mesaj.asama_id ? this.asamalar(this.depo.fikir(fid)!).find((a) => a.id === mesaj.asama_id) : undefined;
+    this.kararlariYaz(fid, [...this.kararlar(fid), {
+      zaman: simdi(), asama_id: asama?.id ?? null, asama_ad: asama?.ad ?? null, soran: mesaj.hedef_ad, baslik: kisalt(metin, 60),
+      soru: `Konuşmadan çıkan karar. Sorulan: ${kisalt(mesaj.soru, 300)}`, cevap: metin, karar_veren: "insan",
+    }]);
+    this.sohbetGuncelle(fid, id, { karar: metin });
+    this.sistemAdimi(fid, asama ?? null, "Karara bağlandı", "karar", `${mesaj.hedef_ad} ile konuşmadan: ${kisalt(metin, 240)}`);
+  }
+
+  // ------------------------------ mevcut proje üzerinde iş ------------------------------
+  private isYolu(fid: string) { return path.join(this.calisma, fid, ".kovan", "is.json"); }
+  private projeAsilYolu(fid: string) { return path.join(this.calisma, fid, ".kovan", "proje-asil"); }
+
+  private isOku(fid: string): IsKaydi | null {
+    return jsonOku<IsKaydi | null>(this.isYolu(fid), null);
+  }
+
+  private isYaz(fid: string, is: IsKaydi): void {
+    atomikYaz(this.isYolu(fid), JSON.stringify(is, null, 2));
+  }
+
+  /** Keşif belgesindeki (henüz onaylanmamış) iş önerisi. */
+  private isOnerisi(fid: string, asamaId: string | null): IsOnerisi | null {
+    const f = this.depo.fikir(fid);
+    const a = f ? this.asamalar(f).find((x) => x.id === asamaId) : undefined;
+    return a?.cikti ? isCikar(this.belgeOku(fid, a.cikti)).is ?? null : null;
+  }
+
+  /** Bu aşamadan sonraki bir aşama daha önce üretim yaptı mı (aşamaya geri dönüldü mü)? */
+  private sonrakiKodYazildi(fid: string, asama: Asama): boolean {
+    const liste = this.asamalar(this.depo.fikir(fid)!);
+    const sonrakiler = new Set(liste.slice(liste.findIndex((a) => a.id === asama.id) + 1).map((a) => a.id));
+    return this.depo.adimlar(fid).some((s) => s.tip === "uret" && s.durum === "tamam" && sonrakiler.has(s.asama_id));
+  }
+
+  /** Test komutu senin yazdığın tek satırdır; orkestratör proje kökünde bash ile koşar. */
+  private komutDenetle(ham: string): string {
+    const k = (ham ?? "").trim();
+    if (!k) throw new KovanHatasi("Test komutu boş olamaz: projenin testlerini koşan komutu yaz (ör. mvn -q test).");
+    if (/[\r\n]/.test(k) || k.length > 300) throw new KovanHatasi("Test komutu tek satır ve en fazla 300 karakter olmalı.");
+    return k;
+  }
+
+  /** Önerilen yazma yolları projede karşılığı olan yerler mi: yolun kendisi ya da üst klasörü var olmalı (uydurma yol geri döner). */
+  private olmayanYollar(fid: string, is: IsOnerisi): string[] {
+    const kod = path.join(this.calisma, fid, "kod");
+    const hatalar: string[] = [];
+    for (const [taraf, a] of Object.entries(is.taraflar)) {
+      for (const y of a.yazma_alani) {
+        if (!fs.existsSync(path.join(kod, y)) && !fs.existsSync(path.dirname(path.join(kod, y))))
+          hatalar.push(`${taraf}.yazma_alani: \`${y}\` projede yok (üst klasörü de yok). Yolu Glob ile doğrula.`);
+      }
+    }
+    return hatalar;
+  }
+
+  /** Teslim planında izin verilen yazılımcılar: mevcut proje işinde yalnızca işin taraflarındakiler. */
+  private planGelistiricileri(fid: string, liste: string[]): string[] {
+    const f = this.depo.fikir(fid);
+    const is = f?.proje ? this.isOku(fid) : null;
+    if (!f || !is) return liste;
+    const harita = Object.assign({}, ...(this.akislar.get(f.profil)?.asamalar ?? []).map((a) => a.gelistiriciler)) as Asama["gelistiriciler"];
+    const uygun = liste.filter((g) => !harita[g] || harita[g].taraf in is.taraflar);
+    return uygun.length ? uygun : liste;
+  }
+
+  /** Öneri kartı: keşfin önerdiği tür, boyut ve yazma alanı ile saptanan test komutu sana gelir; onaylar ya da düzeltirsin. */
+  private kesifSor(fid: string, asama: Asama): Sonuc {
+    const f = this.depo.fikir(fid)!;
+    const oneri = this.isOnerisi(fid, asama.id);
+    if (!oneri) return this.bekleyeAl(fid, asama, "hata", "Keşif belgesindeki iş önerisi okunamadı.", secenekler(["tekrar_dene", "durdur"], "tekrar_dene"));
+    const kart = this.kartlar.get(asama.ajan!)!;
+    const ortak = { coklu: false, soran: kart.id, soran_ad: kart.ad, insan: true };
+    const isaret = (secili: boolean) => (secili ? " (Önerilen)" : "");
+    const komut = f.proje?.test_komutu ?? null;
+    const alanlar = Object.entries(oneri.taraflar)
+      .map(([t, a]) => `${t.toUpperCase()}: ${a.yazma_alani.map((y) => `\`${y}\``).join(", ")}; yeni testler \`${a.test_alani}\``).join(" · ");
+    const sorular: AjanSorusu[] = [
+      { ...ortak, baslik: "İş türü", soru: `Keşfe göre bu iş: ${IS_TURLERI[oneri.tur].toLocaleLowerCase("tr")}. Gerekçe: ${oneri.gerekce}`,
+        neden: "İşin türü, boyutu ve dokunulacak alan senin kararın; ekip bu soruları oylamaz.",
+        secenekler: (Object.keys(IS_TURLERI) as IsTuru[]).map((k) => ({ etiket: IS_TURLERI[k] + isaret(k === oneri.tur), aciklama: TUR_ACIKLAMA[k] })) },
+      { ...ortak, baslik: "Boyut", soru: "İş hangi yoldan geçsin? Boyut, koşacak aşamaları belirler; küçük iş için derin planlama yapılmaz.",
+        secenekler: (Object.keys(IS_BOYUTLARI) as IsBoyutu[]).map((k) => ({ etiket: IS_BOYUTLARI[k] + isaret(k === oneri.boyut), aciklama: BOYUT_ACIKLAMA[k] })) },
+      { ...ortak, baslik: "Test komutu", soru: "Projenin testleri hangi komutla koşsun? Komut proje kökünde çalışır: işe başlamadan önce (baz çizgisi) ve her kod aşamasından sonra." +
+          (komut ? "" : " Projenin yapısından bir komut saptanamadı; kendi komutunu yaz."),
+        secenekler: komut ? [{ etiket: `${komut} (Önerilen)`, aciklama: "Projenin yapısından saptandı. Farklıysa kendi komutunu aşağıya yaz (ör. yalnızca ilgili modülün testleri)." }] : [] },
+      { ...ortak, baslik: "Yazma alanı", soru: `Ajanlar yalnızca şu yollara yazabilecek; projenin gerisine dokunulamaz. ${alanlar}`,
+        secenekler: [{ etiket: `${ALAN_ONAYI} (Önerilen)`, aciklama: "Alan uygun. Uygun değilse seçme; neyin değişmesi gerektiğini aşağıya yaz, keşif notunla yeniden çalışır." }] },
+    ];
+    return this.sorulariSor(fid, asama, sorular, "kesif");
+  }
+
+  /** Ajansız aşama (baz çizgisi): yalnızca komut koşar. Kırmızıysa iş başlamaz; komutu değiştirir ya da durdurursun. */
+  private async kontrolYurut(fid: string, asama: Asama): Promise<Sonuc> {
+    for (const v of asama.dogrulama) {
+      const [yesil, cikti] = await this.komutKos(fid, asama, v, this.depo.fikir(fid)!.tur);
+      if (yesil === null) return "dur";
+      if (!yesil) {
+        return this.bekleyeAl(fid, asama, "hata", `${v.ad}: projenin testleri işe başlamadan kırmızı (\`${v.komut}\`). Kırmızı bir baz çizgisinde hangi hatanın ` +
+          "bu işten geldiği ayırt edilemez. Komutu daralt (ör. yalnızca ilgili modül) ya da çalışma kopyasını düzeltip tekrar dene.",
+          secenekler(["komut_degistir", "tekrar_dene", "durdur"], "komut_degistir"), kuyruk(cikti, 3000));
+      }
+    }
+    return "ok";
+  }
+
+  private yamaOzeti(fid: string): YamaOzeti | null {
+    return jsonOku<YamaOzeti | null>(path.join(this.calisma, fid, ".kovan", "yama.json"), null);
+  }
+
+  /** Dokunulmamış kopya ile çalışma kopyasının farkını cikti/ altına yazar: yama, yamaya girmeyen dosyalar, OKU ve değişiklik notu. */
+  private yamaCikar(fid: string, sessiz = false): void {
+    const f = this.depo.fikir(fid);
+    if (!f?.proje) return;
+    const d = path.join(this.calisma, fid);
+    const cikti = path.join(d, "cikti");
+    const y = yamaYaz(this.projeAsilYolu(fid), path.join(d, "kod", PROJE_KLASORU), cikti);
+    fs.writeFileSync(path.join(cikti, "OKU.md"), yamaOkuBeni(y, f.proje.yol), "utf8");
+    const not = path.join(d, "belgeler", "degisiklik-notu.md");
+    if (fs.existsSync(not)) fs.copyFileSync(not, path.join(cikti, "degisiklik-notu.md"));
+    atomikYaz(path.join(d, ".kovan", "yama.json"), JSON.stringify({ dosya: `cikti/${YAMA_DOSYASI}`, dosyalar: y.dosyalar } satisfies YamaOzeti, null, 2));
+    if (sessiz) return;
+    const ayri = y.dosyalar.filter((x) => x.ayri).length;
+    this.sistemAdimi(fid, null, "Yama", "tamam", y.dosyalar.length
+      ? `${y.dosyalar.length} dosya: cikti/${YAMA_DOSYASI}` + (ayri ? `; ${ayri} dosya yamaya girmedi (cikti/dosyalar/)` : "")
+      : "Projede değişiklik yok; yama boş.");
   }
 
   /** "kalemler" girdisi: her kalemin kapsamı ve kalem aşamalarının çıktıları (yazılımcı notları, test özetleri). */
@@ -1875,7 +2608,12 @@ export class Orkestrator {
     const notlar = new Map<string, string>();
     for (const s of adimlar) if (s.tip === "inceleme" && (s.durum === "onay" || s.durum === "duzelt")) notlar.set(s.ajan_ad, s.ozet);
     if (notlar.size) { satirlar.push("Onay kurulunun son notları:"); for (const [ad, oz] of notlar) satirlar.push(`  ${ad}: ${oz}`); }
-    const dosyalar = this.kodDosyalari(fid);
+    const yama = this.yamaOzeti(fid);
+    const dosyalar = yama ? [] : this.kodDosyalari(fid);
+    if (yama) {
+      const etiket = { eklendi: "eklendi", silindi: "silindi", degisti: "değişti" };
+      satirlar.push(`Yama (${yama.dosya}): ` + (yama.dosyalar.slice(0, 30).map((x) => `${x.yol} (${etiket[x.durum]})`).join(", ") || "değişiklik yok") + (yama.dosyalar.length > 30 ? " …" : ""));
+    }
     if (dosyalar.length) satirlar.push("Kod dosyaları: " + dosyalar.slice(0, 30).join(", ") + (dosyalar.length > 30 ? " …" : ""));
     return satirlar.join("\n") || null;
   }
@@ -1904,9 +2642,12 @@ export class Orkestrator {
       });
     const kod = listele("kod").filter((x) => x.yol !== "kod/package.json");
     const kaynakOnek = `kod/${KAYNAK_KLASORU}/`;
+    const projeOnek = this.depo.fikir(fid)?.proje ? `kod/${PROJE_KLASORU}/` : null;
+    const projede = (yol: string) => projeOnek !== null && yol.startsWith(projeOnek);
     return {
       belgeler: listele("belgeler"), incelemeler: listele("incelemeler"),
-      kod: kod.filter((x) => !x.yol.startsWith(kaynakOnek)), kaynak: kod.filter((x) => x.yol.startsWith(kaynakOnek)),
+      kod: kod.filter((x) => !x.yol.startsWith(kaynakOnek) && !projede(x.yol)), kaynak: kod.filter((x) => x.yol.startsWith(kaynakOnek)),
+      proje: kod.filter((x) => projede(x.yol)), cikti: listele("cikti"),
     };
   }
 }

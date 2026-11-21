@@ -10,6 +10,7 @@ kaynak: zorunlu            # fikir, mevcut sistemin klasörüyle başlar (kod/ka
 
 asamalar:
   - id: mevcut-sistem
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
     ad: Mevcut sistemi anlama
     ajan: mevcut-sistem-analisti
     is_kurali_sana: true      # iş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir
@@ -41,6 +42,7 @@ asamalar:
     en_fazla_tur: 3
 
   - id: brif
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
     ad: Kapsam ve kabul paketi
     ajan: urun-sahibi
     is_kurali_sana: true      # iş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir
@@ -53,6 +55,7 @@ asamalar:
     cikti: brif
 
   - id: hedef-analiz
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
     ad: Hedef analiz
     ajan: analist
     is_kurali_sana: true      # iş kuralı soruları (doküman-kod farkı, hesap, kapsam) ekibe uğramadan sana gelir
@@ -82,6 +85,8 @@ asamalar:
     en_fazla_tur: 3
 
   - id: teknik-plan
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
+    once_soru: true           # Mimar planı yazmadan önce en çok şeyi değiştiren mimari seçimleri sana getirir
     ad: Teknik plan
     ajan: mimar
     gorev: >
@@ -109,6 +114,7 @@ asamalar:
     en_fazla_tur: 2
 
   - id: teslim-plani
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
     ad: Teslim planı
     ajan: proje-yoneticisi
     gorev: >

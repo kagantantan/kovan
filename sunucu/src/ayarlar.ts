@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
 
-import type { HedefYigin, Mod } from "./tipler.js";
+import { KATILIMLAR, type HedefYigin, type Katilim, type Mod } from "./tipler.js";
 import type { UyumluMotorAyari } from "./uyumlu.js";
 
 export const MODLAR: readonly Mod[] = ["hibrit", "claude", "deneme", "yerel"];
@@ -48,6 +48,12 @@ export interface OrtakKararAyari {
   kural: "oybirligi" | "cogunluk";  // oybirliği: hepsi aynı seçeneği seçmeli
 }
 
+/** Büyük Birader: her aşamanın sonunda bütün işe bakan, veto edebilen gözetmen. */
+export interface BiraderAyari {
+  acik: boolean;
+  en_fazla_veto: number;            // bir aşamada en fazla kaç veto; dolunca karar sana gelir
+}
+
 export interface Ayarlar {
   port: number;
   motor: Mod;                       // yeni fikirde varsayılan mod
@@ -63,6 +69,8 @@ export interface Ayarlar {
   ajan_sorulari: boolean;           // ajanlar insana seçenekli soru sorabilsin mi
   en_fazla_soru_turu: number;       // bir aşamada en fazla kaç soru turu
   ortak_karar: OrtakKararAyari;
+  katilim: Katilim;                 // yeni fikirde aşama sonu kapıları: sonda, planlama, her_asama
+  buyuk_birader: BiraderAyari;
   motorlar: Record<string, MotorAyari>;
   claude: boolean;                  // false: Claude'a hiç bağlanılmaz, claude komutu aranmaz
   modlar: Mod[];                    // arayüzde ve API'de açık modlar
@@ -86,6 +94,8 @@ export const VARSAYILAN: Ayarlar = {
   ajan_sorulari: true,
   en_fazla_soru_turu: 2,
   ortak_karar: { acik: true, kurul: ["urun-sahibi", "mimar", "analist"], kural: "oybirligi" },
+  katilim: "planlama",
+  buyuk_birader: { acik: true, en_fazla_veto: 2 },
   motorlar: { "qwen-yerel": { tur: "ollama", adres: "http://127.0.0.1:11434", model: "qwen3-coder:30b" } },
   claude: true,
   modlar: [...MODLAR],
@@ -151,8 +161,11 @@ export function ayarlariYukle(kok: string, disYol: string | null | undefined = p
   }
   const motorKaynagi: Record<string, string> = {};
   for (const { ad, veri } of katmanlar) {
-    const { ortak_karar: ok, motorlar, ...diger } = veri;
+    const { ortak_karar: ok, motorlar, buyuk_birader: bb, ...diger } = veri;
     Object.assign(cfg, diger);
+    // buyuk_birader: false kısayolu ya da eksik alanlı sözlük
+    if (bb === false || bb === true) cfg.buyuk_birader = { ...VARSAYILAN.buyuk_birader, acik: bb };
+    else if (bb && typeof bb === "object") cfg.buyuk_birader = { ...VARSAYILAN.buyuk_birader, ...(bb as Partial<BiraderAyari>) };
     // ortak_karar: false kısayolu ya da eksik alanlı sözlük
     if (ok === false || ok === true) cfg.ortak_karar = { ...VARSAYILAN.ortak_karar, acik: ok };
     else if (ok && typeof ok === "object") cfg.ortak_karar = { ...VARSAYILAN.ortak_karar, ...(ok as Partial<OrtakKararAyari>) };
@@ -208,5 +221,9 @@ export function ayarlariYukle(kok: string, disYol: string | null | undefined = p
   k.kurul = k.kurul.map(String);
   k.acik = Boolean(k.acik);
   if (k.kural !== "oybirligi" && k.kural !== "cogunluk") throw new Error("kovan.yaml: ortak_karar.kural 'oybirligi' ya da 'cogunluk' olmalı");
+  if (!KATILIMLAR.includes(cfg.katilim)) throw new Error(`ayarlar: katilim şunlardan biri olmalı: ${KATILIMLAR.join(", ")}`);
+  cfg.buyuk_birader.acik = Boolean(cfg.buyuk_birader.acik);
+  cfg.buyuk_birader.en_fazla_veto = Number(cfg.buyuk_birader.en_fazla_veto);
+  if (!(cfg.buyuk_birader.en_fazla_veto >= 0)) throw new Error("ayarlar: buyuk_birader.en_fazla_veto sıfır ya da pozitif bir sayı olmalı");
   return cfg;
 }

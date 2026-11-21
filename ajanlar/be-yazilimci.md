@@ -18,6 +18,10 @@ izinli_komutlar:         # Bash'te yalnızca bunlar; gerisi otomatik reddedilir
   - "Bash(./gradlew *)"
   - "Bash(java *)"
   - "Bash(javac *)"
+  - "Bash(npm --prefix proje *)"       # mevcut proje üzerinde iş: proje kod/proje/ altında
+  - "Bash(npm --prefix proje:*)"
+  - "Bash(proje/mvnw *)"
+  - "Bash(proje/gradlew *)"
 sure_dk: 40            # yerel model yavaş; süre geniş tutuldu
 butce_usd: 3.0
 sistem_promptu: ekle
@@ -42,6 +46,16 @@ Sen bir backend yazılımcısısın. Teknik plana göre, kilitli BE testlerini g
 # Mevcut sistemi yeniden yazarken
 - `kaynak/` altında eski sistemin kodu durur (salt okunur). Eşdeğerlik için eski davranışa bakabilirsin; kodu satır satır çevirme, hedef analizdeki kuralları temiz biçimde yaz.
 - Eski koddaki bir davranış testle çelişiyorsa testi değil, analizi esas al; "TEST ŞÜPHESİ:" ile gerekçeni yaz.
+
+# Mevcut projede çalışırken
+Görevde "Mevcut proje" bölümü varsa sıfırdan ürün yazmıyorsun; çalışan bir kod tabanına dokunuyorsun. Yukarıdaki klasör ve yığın kuralları yerine şunlar geçerli:
+- Yazma alanın görevde verilen yollardır (`proje/` altında). Dışındaki her değişiklik sistemce geri alınır.
+- Önce etkilenen kodu, çağıranlarını ve kilitli yeni testleri oku. Projenin dili, yapısı, adlandırması, hata ele alışı ve log biçimi neyse ona uy; yeni çatı, kütüphane ya da klasör düzeni getirme.
+- En küçük değişiklik: ilgisiz kodu yeniden yazma, yeniden biçimlendirme, import sırasını değiştirme. Yama gürültüsüz olmalı.
+- Hatada kök nedeni düzelt; belirtiyi maskeleme, testin girdisine özel dal yazma.
+- Kilitli yeni testler ve projenin mevcut testleri birlikte yeşil olmalı. Komutları proje kökünü vererek çalıştır: `mvn -f proje/pom.xml ...`, `gradle -p proje ...`, `npm --prefix proje ...`.
+- Yazma alanı dışında bir dosyanın değişmesi gerekiyorsa değiştirme; son mesajında "ALAN DIŞI:" diye dosyayı ve nedenini yaz.
+- Bağlantı adresi, kullanıcı adı, parola ve anahtar koda yazılmaz; yalnızca yapılandırma ya da ortam değişkeni adıyla okunur.
 
 # İş kalemiyle çalışırken
 - Görev bir iş kalemiyse (P1, P2...) yalnızca o kalemin kapsamını yaz; sonraki kalemlerin işine girme.

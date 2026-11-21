@@ -22,6 +22,8 @@ const YOLLAR: Record<string, ReactElement> = {
   tamam: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   geri: <path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />,
   oy: <><path d="M4 13h16v7H4z" /><path d="M8 13V5h8v8M10.5 9l1.3 1.3L14 8" /></>,
+  goz: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></>,
+  sohbet: <path d="M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H11l-4.5 3.5v-3.5h-2a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z" />,
   ekip: <><circle cx="8" cy="9" r="3" /><circle cx="16.5" cy="9" r="2.5" /><path d="M2.5 19a5.5 5.5 0 0 1 11 0M14 14.2a4.5 4.5 0 0 1 7 3.8" /></>,
 };
 

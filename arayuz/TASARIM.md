@@ -24,6 +24,7 @@ Birincil iş: hangi fikrin nerede olduğunu görmek ve ajanların getirdiği kar
 ┌ Kovan  Fikirler Ajanlar Akışlar ─────────────── Claude ● yerel ○  Bildirim ┐
 │ + Yeni fikir │ Başlık                                        Durdur        │
 │ fikir satırı │ akış, mod, aşama, süre, bütçe çizgisi                       │
+│ fikir satırı │         ◉  ← Büyük Birader'in gözü (şeridin tepesinde)       │
 │ fikir satırı │ ⬡⬡⬢⬡⬡⬡⬡  ← petek şeridi (imza öğe)                         │
 │ ...          │ ┌ karar yuvası (bal kenarlı, tek yükseltilmiş öğe) ┐         │
 │              │ └──────────────────────────────────────────────────┘         │
@@ -34,6 +35,7 @@ Sola hizalı. Geniş ekranda alt bölüm ekran yüksekliğini doldurur, iki süt
 
 ## İlkeler
 1. Cesaret tek yerde: petek şeridi. Aşamalar birbirine yapışık altıgen hücreler; çalışan hücre balla dolar, onaylanan hücre mumla sırlanır (kilit = sırlama). Gerisi sakin.
+   Şeridin tepesinde Büyük Birader'in gözü durur: ortada, büyük, tek başına. Rengi son hükmüdür (yosun: uygun, bal: dikkat, pas: veto), bakışı o anki aşamaya döner, değerlendirme yaparken kırpar. Şeridin parçasıdır; ikinci bir "cesur" öğe değildir.
 2. Karar birinci sınıf: karar yuvası petekle zaman çizelgesi arasında, katlanmanın üstünde. Seçenekler açıklamalı, önerilen ilk sırada, kendi cevabını yazmak her zaman mümkün.
 3. Kimin yaptığı görünür: her adımda ajan ve motor (Claude ya da yerel). Hibrit yapı ürünün kendisi.
 4. Belgeler belge gibi (serif), günlükler günlük gibi (mono).

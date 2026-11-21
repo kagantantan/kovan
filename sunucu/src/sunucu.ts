@@ -156,6 +156,8 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
       ajan_sorulari: cfg.ajan_sorulari, en_fazla_soru_turu: cfg.en_fazla_soru_turu, motorlar: durumlar,
       hedef_yiginlar: HEDEF_YIGINLAR,
       ornek_kaynak: fs.existsSync(path.join(kok, "ornekler", "reeskont-eski")) ? path.join(kok, "ornekler", "reeskont-eski") : null,
+      ornek_proje: fs.existsSync(path.join(kok, "ornekler", "proje-ornek")) ? path.join(kok, "ornekler", "proje-ornek") : null,
+      katilim: cfg.katilim, buyuk_birader: cfg.buyuk_birader.acik,
       yerel_motor: ork.yerelMotorAdi(),
       modlar: ork.acikModlar(),
       dis_ayar: cfg.dis_ayar,
@@ -230,19 +232,21 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
     };
   }));
 
-  // Var olan sistemle başlayan akışlar (replatform) sonda: sıfırdan ürün akışları birbirinin kısası, uzunu
+  // Var olan kodla başlayan akışlar (mevcut proje, replatform) sonda: sıfırdan ürün akışları birbirinin kısası, uzunu
+  const akisSirasi = { yok: 0, proje: 1, zorunlu: 2 };
   app.get("/api/akislar", async () => [...akislar.values()]
-    .sort((a, b) => Number(a.kaynak === "zorunlu") - Number(b.kaynak === "zorunlu"))
+    .sort((a, b) => akisSirasi[a.kaynak] - akisSirasi[b.kaynak])
     .map((a) => akisOzeti(a, kartlar)));
 
   app.get("/api/fikirler", async () => ork.fikirListesi());
 
   app.post("/api/fikirler", async (req) => {
     const b = govde(req.body);
-    // kaynaklar: liste ya da satır satır yollar (replatform: mevcut sistemin klasörleri)
+    // kaynaklar: liste ya da satır satır yollar (replatform: mevcut sistemin klasörleri; mevcut proje: ekler)
+    // proje: mevcut proje üzerinde işte projenin bu makinedeki klasörü
     const kaynaklar = Array.isArray(b.kaynaklar) ? b.kaynaklar.map(String) : metin(b.kaynaklar).split("\n");
     const fid = await ork.yeniFikir(metin(b.baslik), metin(b.metin), metin(b.profil), metin(b.motor) || cfg.motor,
-      { kaynaklar, hedef_yigin: metin(b.hedef_yigin) });
+      { kaynaklar, hedef_yigin: metin(b.hedef_yigin), proje: metin(b.proje), katilim: metin(b.katilim) });
     return { id: fid };
   });
 
@@ -285,8 +289,8 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
 
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/klasor-ac", async (req) => {
     const alt = metin(govde(req.body ?? {}).alt);
-    if (!["", "kod", "belgeler"].includes(alt)) throw new KovanHatasi("alt yalnızca kod ya da belgeler olabilir.");
-    const yol = ork.fikirKlasoru(req.params.fid, alt as "" | "kod" | "belgeler");
+    if (!["", "kod", "belgeler", "cikti"].includes(alt)) throw new KovanHatasi("alt yalnızca kod, belgeler ya da cikti olabilir.");
+    const yol = ork.fikirKlasoru(req.params.fid, alt as "" | "kod" | "belgeler" | "cikti");
     if (!fs.existsSync(yol)) throw new KovanHatasi(`${alt || "Fikir"} klasörü henüz yok.`, 404);
     (secenek.klasorAcici ?? klasoruAc)(yol);
     return { ok: true, yol };
@@ -294,6 +298,23 @@ export async function kovanKur(kok: string, secenek: KurulumSecenekleri = {}): P
 
   app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/mod", async (req) => {
     ork.modDegistir(req.params.fid, metin(govde(req.body).mod));
+    return { ok: true };
+  });
+
+  // Aşama sonu kapıları: sonda, planlama, her_asama. Sonraki aşama sonlarından itibaren geçerli.
+  app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/katilim", async (req) => {
+    ork.katilimDegistir(req.params.fid, metin(govde(req.body).katilim));
+    return { ok: true };
+  });
+
+  // Ajanla (ya da Büyük Birader'le) konuşma: soru arka planda cevaplanır, cevap fikir detayındaki sohbet listesine düşer.
+  app.post<{ Params: { fid: string } }>("/api/fikirler/:fid/sor", async (req) => {
+    const b = govde(req.body);
+    return { id: ork.sor(req.params.fid, metin(b.hedef), metin(b.asama) || null, metin(b.soru)) };
+  });
+
+  app.post<{ Params: { fid: string; mid: string } }>("/api/fikirler/:fid/sohbet/:mid/karar", async (req) => {
+    ork.sohbetKarari(req.params.fid, Number(req.params.mid), metin(govde(req.body).metin));
     return { ok: true };
   });
 

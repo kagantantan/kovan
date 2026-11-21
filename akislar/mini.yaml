@@ -5,9 +5,11 @@ aciklama: >
   sana gelir. Seremoni en az.
 fikir_butcesi_usd: 3
 ortak_karar: false
+buyuk_birader: false       # küçük iş: Büyük Birader çalışmaz
 
 asamalar:
   - id: brif
+    kapi: true                # "planlama" katılımında aşamanın sonunda onay kapın açılır
     ad: Brif
     ajan: urun-sahibi
     gorev: >

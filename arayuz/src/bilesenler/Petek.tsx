@@ -24,8 +24,8 @@ export interface PetekHucresi {
 /** Bir akışın boş (henüz çalışmamış) petek hücreleri: akış önizlemesi için. */
 export function akisHucreleri(akis: AkisOzeti): PetekHucresi[] {
   return akis.asamalar.map((s) => ({
-    id: s.id, ad: s.ad, tur: s.tur, durum: "bekleyen", ajan: s.ajan_kisa ?? (s.tur === "kalemler" ? "PLAN" : "Sen"),
-    ajan_ad: s.ajan_ad ?? (s.tur === "kalemler" ? "Teslim planındaki iş kalemleri" : "Sen"), motor: null,
+    id: s.id, ad: s.ad, tur: s.tur, durum: "bekleyen", ajan: s.ajan_kisa ?? (s.tur === "kalemler" ? "PLAN" : s.tur === "kontrol" ? "TEST" : "Sen"),
+    ajan_ad: s.ajan_ad ?? (s.tur === "kalemler" ? "Teslim planındaki iş kalemleri" : s.tur === "kontrol" ? "Sistem (projenin test komutu)" : "Sen"), motor: null,
     kilitle: s.kilitle, en_fazla_tur: s.en_fazla_tur,
     onaylar: s.dogrulama.map((d) => ({ ad: d.inceleyen_ad ? `${d.ad}, ${d.inceleyen_ad}` : d.ad, kisa: "", durum: null })),
   }));
@@ -41,15 +41,15 @@ const DURUM_ADI: Record<AsamaDurumu, string> = {
 
 export function onayTonu(durum: string | null): string {
   if (durum === "onay" || durum === "yesil") return "iyi";
-  if (durum === "duzelt" || durum === "kirmizi" || durum === "hata" || durum === "takildi") return "kotu";
-  if (durum === "soru" || durum === "insana") return "dikkat";
+  if (durum === "duzelt" || durum === "kirmizi" || durum === "hata" || durum === "takildi" || durum === "veto") return "kotu";
+  if (durum === "soru" || durum === "insana" || durum === "uyari") return "dikkat";
   if (durum === "calisiyor") return "calisan";
   return "bos";
 }
 
 const ONAY_ADI: Record<string, string> = {
   onay: "onayladı", yesil: "yeşil", duzelt: "düzeltme istedi", kirmizi: "kırmızı", soru: "soru sordu",
-  hata: "hata", takildi: "süre doldu", calisiyor: "inceliyor", atlandi: "kapsam dışı, atlandı",
+  hata: "hata", takildi: "süre doldu", calisiyor: "inceliyor", atlandi: "kapsam dışı, atlandı", veto: "veto etti", uyari: "dikkat çekti",
 };
 
 interface Props {

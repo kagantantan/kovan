@@ -2,10 +2,13 @@
 //   ```kovan-plan     Proje Yöneticisi'nin teslim planı: sıralı iş kalemleri (P1, P2...) ve bağımlılıkları
 //   ```kovan-gelisim  Ürün Sahibi'nin gelişim önerileri (G1, G2...)
 //   ```kovan-adr      Mimar'ın mimari karar kayıtları (ADR-1, ADR-2...): her biri en az iki seçenekle
+//   ```kovan-is       Keşfin iş önerisi (mevcut proje): tür, boyut, taraf başına yazma ve test alanı
+//   ```kovan-ozet     Aşamanın karar özeti: kapıda madde madde onaylanır, Büyük Birader önceki aşamaları bunlardan izler
 // Bloklar YAML ya da JSON olabilir. Hatalar insan diliyle döner; üreten ajana bulgu olarak gider.
 import YAML from "yaml";
-import type { Asama } from "./akislar.js";
-import type { Adr, AdrSecenegi, GelisimOnerisi, PlanKalemi } from "./tipler.js";
+import { guvenliYol, type Asama } from "./akislar.js";
+import { altinda } from "./ortak.js";
+import type { Adr, AdrSecenegi, GelisimOnerisi, IsBoyutu, IsKaydi, IsOnerisi, IsTarafi, IsTuru, Kosul, OzetMaddesi, PlanKalemi } from "./tipler.js";
 
 export const EN_FAZLA_KALEM = 8;
 export const EN_FAZLA_ONERI = 5;
@@ -108,9 +111,146 @@ export function kalemleriGenislet(sablon: Asama, kalemler: PlanKalemi[], surum =
         .map((v) => ({ ...v, ad: yaz(v.ad), komut: v.komut ? yaz(v.komut) : null, odak: yaz(v.odak) })),
       soru: yaz(a.soru),
       geri_donus: null,
+      taraf: g?.taraf ?? null,
       kalem: { id: k.id, baslik: k.baslik },
     }));
   });
+}
+
+// ------------------------------ mevcut proje üzerinde iş ------------------------------
+export const IS_TURLERI: Record<IsTuru, string> = { hata: "Hata düzeltme", ozellik: "Yeni özellik", entegrasyon: "Entegrasyon" };
+export const IS_BOYUTLARI: Record<IsBoyutu, string> = { kucuk: "Küçük", orta: "Orta", buyuk: "Büyük" };
+export const IS_TARAFLARI = ["be", "fe"];
+export const EN_FAZLA_YAZMA_YOLU = 12;
+const PROJE = "proje";   // proje.ts'teki PROJE_KLASORU ile aynı (plan.ts dosya sistemi modüllerini içe almaz)
+
+const duz = (v: unknown) => metin(v).toLocaleLowerCase("tr").replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c");
+const TUR_ADLARI: Record<string, IsTuru> = { hata: "hata", bug: "hata", ozellik: "ozellik", feature: "ozellik", entegrasyon: "entegrasyon" };
+const BOYUT_ADLARI: Record<string, IsBoyutu> = { kucuk: "kucuk", s: "kucuk", orta: "orta", m: "orta", buyuk: "buyuk", l: "buyuk" };
+
+/** Öneri kartındaki yol: güvenli, proje/ altında ve projenin tamamı değil. Hata varsa metni döner. */
+function isYolu(ham: unknown, yer: string): { yol?: string; hata?: string } {
+  let y: string;
+  try { y = guvenliYol(ham); } catch { return { hata: `${yer}: geçersiz yol '${metin(ham)}' (mutlak yol ve '..' olmaz).` }; }
+  if (/[{}*?\[\]]/.test(y)) return { hata: `${yer}: '${y}' joker ya da yer tutucu içeremez; klasör ya da dosya yolu yaz.` };
+  if (y === PROJE) return { hata: `${yer}: projenin tamamı verilemez; etkilenen klasör ya da dosyaları yaz.` };
+  if (!altinda(y, PROJE)) return { hata: `${yer}: '${y}' ${PROJE}/ altında olmalı.` };
+  return { yol: y };
+}
+
+/** Öneri kartının iç tutarlılığı (ajanın önerisi ve senin değiştirdiğin hali aynı denetimden geçer). */
+export function isDenetle(is: IsOnerisi): string[] {
+  const hatalar: string[] = [];
+  const taraflar = Object.keys(is.taraflar);
+  if (!taraflar.length) hatalar.push(`En az bir taraf olmalı (${IS_TARAFLARI.join(", ")}).`);
+  if (is.boyut === "kucuk" && taraflar.length > 1) hatalar.push("Küçük iş tek tarafta olur; iki tarafı da etkiliyorsa boyut en az orta olmalı.");
+  return hatalar;
+}
+
+/** ```kovan-is bloğunu okur ve denetler. */
+export function isCikar(belge: string): { is?: IsOnerisi; hatalar?: string[] } {
+  const govde = blokBul(belge, "kovan-is");
+  if (govde === null) return { hatalar: ["Belgede ```kovan-is bloğu yok. İş önerisini (tur, boyut, gerekce, taraflar) bu blokta yaz."] };
+  let ham: Record<string, unknown> | null;
+  try { ham = YAML.parse(govde); } catch (e) { return { hatalar: [`kovan-is blok okunamadı (YAML/JSON): ${(e as Error).message.split("\n")[0]}`] }; }
+  if (!ham || typeof ham !== "object" || Array.isArray(ham)) return { hatalar: ["kovan-is bloğu bir eşleme olmalı: tur, boyut, gerekce, taraflar."] };
+  const hatalar: string[] = [];
+  const tur = TUR_ADLARI[duz(ham.tur)];
+  if (!tur) hatalar.push(`tur şunlardan biri olmalı: ${Object.keys(IS_TURLERI).join(", ")} ('${metin(ham.tur) || "-"}' yazılmış).`);
+  const boyut = BOYUT_ADLARI[duz(ham.boyut)];
+  if (!boyut) hatalar.push(`boyut şunlardan biri olmalı: ${Object.keys(IS_BOYUTLARI).join(", ")} ('${metin(ham.boyut) || "-"}' yazılmış).`);
+  const gerekce = metin(ham.gerekce);
+  if (!gerekce) hatalar.push("gerekce boş: türü ve boyutu neden böyle seçtiğini bir iki cümleyle yaz.");
+  const taraflar: Record<string, IsTarafi> = {};
+  const hamTaraflar = ham.taraflar && typeof ham.taraflar === "object" && !Array.isArray(ham.taraflar) ? ham.taraflar as Record<string, any> : {};
+  for (const [ad, t] of Object.entries(hamTaraflar)) {
+    const taraf = duz(ad);
+    if (!IS_TARAFLARI.includes(taraf)) { hatalar.push(`taraflar: '${ad}' diye bir taraf yok (${IS_TARAFLARI.join(", ")}).`); continue; }
+    const yollar = dizi(t?.yazma_alani);
+    if (!yollar.length) hatalar.push(`${taraf}: yazma_alani boş; etkilenen klasör ya da dosyaları yaz.`);
+    if (yollar.length > EN_FAZLA_YAZMA_YOLU) hatalar.push(`${taraf}: yazma_alani en fazla ${EN_FAZLA_YAZMA_YOLU} yol olabilir (${yollar.length} var); ortak üst klasörü ver.`);
+    const yazma: string[] = [];
+    for (const y of yollar.slice(0, EN_FAZLA_YAZMA_YOLU)) {
+      const r = isYolu(y, `${taraf}.yazma_alani`);
+      if (r.hata) hatalar.push(r.hata); else if (!yazma.includes(r.yol!)) yazma.push(r.yol!);
+    }
+    const test = isYolu(t?.test_alani, `${taraf}.test_alani`);
+    if (!metin(t?.test_alani)) hatalar.push(`${taraf}: test_alani boş; yeni testlerin yazılacağı klasörü yaz.`);
+    else if (test.hata) hatalar.push(test.hata);
+    taraflar[taraf] = { yazma_alani: yazma, test_alani: test.yol ?? "" };
+  }
+  if (hatalar.length) return { hatalar };
+  const is: IsOnerisi = { tur: tur!, boyut: boyut!, gerekce, taraflar };
+  const tutarlilik = isDenetle(is);
+  return tutarlilik.length ? { hatalar: tutarlilik } : { is };
+}
+
+/** Aşama bu işte koşar mı? Koşulsuz aşama her zaman koşar. */
+export function kosulTutar(k: Kosul | null, is: Pick<IsKaydi, "boyut" | "taraflar">): boolean {
+  if (!k) return true;
+  if (k.boyut && !k.boyut.includes(is.boyut)) return false;
+  if (k.taraf && !k.taraf.some((t) => t in is.taraflar)) return false;
+  return true;
+}
+
+/**
+ * Aşamadaki öneri kartı yer tutucularını doldurur: {test_komutu}, {yazma_alani}, {test_alani}, {is_turu}; kalem dışındaki
+ * {gelistirici} işin tarafından seçilir. yazabilir ve kilitle içinde alanlar liste olarak açılır. Aşamanın tarafı belliyse
+ * (kalem adımı, {gelistirici} aşaması) yalnızca o tarafın alanları, değilse bütün tarafların alanları kullanılır.
+ */
+export function isUygula(a: Asama, is: IsKaydi): Asama {
+  const taraflar = Object.keys(is.taraflar);
+  let { ajan, taraf } = a;
+  if (ajan === "{gelistirici}") {
+    taraf = taraflar[0] ?? null;
+    ajan = Object.entries(a.gelistiriciler).find(([, g]) => g.taraf === taraf)?.[0] ?? ajan;
+  }
+  const secili = taraf && is.taraflar[taraf] ? [is.taraflar[taraf]] : Object.values(is.taraflar);
+  const tekil = (l: string[]) => [...new Set(l)];
+  const yazma = tekil(secili.flatMap((t) => t.yazma_alani));
+  const test = tekil(secili.map((t) => t.test_alani));
+  const degerler: Record<string, string> = { test_komutu: is.test_komutu, yazma_alani: yazma.join(", "), test_alani: test.join(", "), is_turu: IS_TURLERI[is.tur] };
+  const yaz = (s: string) => s.replace(/\{([a-z_]+)\}/g, (m, ad: string) => degerler[ad] ?? m);
+  const yollar = (l: string[]) => tekil(l.flatMap((y) =>
+    y.includes("{yazma_alani}") ? yazma.map((v) => y.replace("{yazma_alani}", v)) : y.includes("{test_alani}") ? test.map((v) => y.replace("{test_alani}", v)) : [y]));
+  return {
+    ...a, ajan, taraf,
+    gorev: yaz(a.gorev),
+    yazabilir: yollar(a.yazabilir),
+    kilitle: yollar(a.kilitle),
+    dogrulama: a.dogrulama.filter((v) => a.kalem || !v.taraf || taraflar.includes(v.taraf))
+      .map((v) => ({ ...v, komut: v.komut ? yaz(v.komut) : null, odak: yaz(v.odak) })),
+  };
+}
+
+// ------------------------------ karar özeti ------------------------------
+export const EN_AZ_OZET = 1;
+export const EN_FAZLA_OZET = 8;
+const OZET_TURLERI: Record<string, OzetMaddesi["tur"]> = { karar: "karar", varsayim: "varsayim", kapsam: "kapsam" };
+
+/** ```kovan-ozet bloğunu okur ve denetler: aşamada karara bağlananlar, düz dille. */
+export function ozetCikar(belge: string): { maddeler?: OzetMaddesi[]; hatalar?: string[] } {
+  const govde = blokBul(belge, "kovan-ozet");
+  if (govde === null) return { hatalar: ["Belgede ```kovan-ozet bloğu yok. Bu aşamada karara bağlananları belgenin sonunda bu blokta listele."] };
+  const l = liste(govde, "kararlar");
+  if (!l.liste) return { hatalar: [`kovan-ozet ${l.hata}. En az ${EN_AZ_OZET} madde olmalı.`] };
+  const hatalar: string[] = [];
+  if (l.liste.length > EN_FAZLA_OZET) hatalar.push(`En fazla ${EN_FAZLA_OZET} madde olabilir (${l.liste.length} var); en çok şeyi değiştiren kararları seç.`);
+  const maddeler: OzetMaddesi[] = [];
+  const basliklar = new Set<string>();
+  l.liste.slice(0, EN_FAZLA_OZET).forEach((m, i) => {
+    const baslik = metin(m?.baslik);
+    const yer = baslik || `${i + 1}. madde`;
+    if (!baslik) hatalar.push(`${yer}: baslik boş.`);
+    else if (basliklar.has(sade(baslik))) hatalar.push(`${yer}: aynı başlık iki kez kullanılmış.`);
+    basliklar.add(sade(baslik));
+    const karar = metin(m?.karar);
+    if (!karar) hatalar.push(`${yer}: karar boş; ne karara bağlandığını bir iki cümleyle yaz.`);
+    const neden = metin(m?.neden);
+    if (!neden) hatalar.push(`${yer}: neden boş; kararın dayanağını yaz.`);
+    maddeler.push({ baslik, karar, neden, alternatif: metin(m?.alternatif), tur: OZET_TURLERI[duz(m?.tur)] ?? "karar" });
+  });
+  return hatalar.length ? { hatalar } : { maddeler };
 }
 
 const EFORLAR: Record<string, string> = { s: "S", k: "S", kucuk: "S", küçük: "S", m: "M", orta: "M", l: "L", b: "L", buyuk: "L", büyük: "L" };
